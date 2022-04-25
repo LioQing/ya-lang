@@ -48,7 +48,7 @@ fn separators() {
 fn missing_opening_bracket() {
     let mut lexer = Lexer::new("}");
 
-    assert_eq!(lexer.next_token(), Err(LexerError::NoOpenBracket { close: '}' }));
+    assert_eq!(lexer.next_token(), Err(LexerError::NoOpeningBracket { close: '}' }));
 }
 
 #[test]
@@ -197,4 +197,69 @@ fn common_identifiers() {
     assert_eq!(lexer.next_token(), Ok(Token::Identifier { raw: "_field".to_owned() }));
     assert_eq!(lexer.next_token(), Ok(Token::Identifier { raw: "no_1".to_owned() }));
     assert_eq!(lexer.next_token(), Ok(Token::Identifier { raw: "SCREAMING_SNAKE_CASE".to_owned() }));
+}
+
+#[test]
+fn normal_string() {
+    let mut lexer = Lexer::new("\"foo\"");
+
+    assert_eq!(lexer.next_token(), Ok(Token::StringChar {
+        raw: "foo".to_owned(),
+        prefix: "".to_owned(),
+        suffix: "".to_owned(),
+        quote: '"',
+    }));
+}
+
+#[test]
+fn string_with_prefix_and_suffix() {
+    let mut lexer = Lexer::new("foo\"bar\"baz");
+
+    assert_eq!(lexer.next_token(), Ok(Token::StringChar {
+        raw: "bar".to_owned(),
+        prefix: "foo".to_owned(),
+        suffix: "baz".to_owned(),
+        quote: '"',
+    }));
+}
+
+#[test]
+fn string_with_escape_sequence() {
+    let mut lexer = Lexer::new("\"\\n\\r\\t\\\"\\'\\\\\"");
+
+    assert_eq!(lexer.next_token(), Ok(Token::StringChar {
+        raw: "\n\r\t\"'\\".to_owned(),
+        prefix: "".to_owned(),
+        suffix: "".to_owned(),
+        quote: '"',
+    }));
+}
+
+#[test]
+fn char_with_prefix_suffix_escape_sequence() {
+    let mut lexer = Lexer::new("abc'def\\n\\tghi'jkl");
+
+    assert_eq!(lexer.next_token(), Ok(Token::StringChar {
+        raw: "def\n\tghi".to_owned(),
+        prefix: "abc".to_owned(),
+        suffix: "jkl".to_owned(),
+        quote: '\'',
+    }));
+}
+
+#[test]
+fn string_with_unknown_escape_sequence() {
+    let mut lexer = Lexer::new("abc\"def\\zghi\"jkl");
+
+    assert_eq!(lexer.next_token(), Err(LexerError::UnknownEscapeSequence {
+        raw: "abc\"def\\zghi\"jkl".to_owned(),
+        sequence: "\\z".to_owned()
+    }));
+}
+
+#[test]
+fn string_with_no_closing_quotation_mark() {
+    let mut lexer = Lexer::new("abc\"def");
+
+    assert_eq!(lexer.next_token(), Err(LexerError::NoClosingQuote { raw: "abc\"def".to_owned() }));
 }
