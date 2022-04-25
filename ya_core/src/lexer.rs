@@ -6,13 +6,16 @@ mod lexer_tests;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum LexerError {
-    #[error("Imbalanced brackets found: expected `{expected}`, found `{found}`")]
-    ImbalancedBrackets { expected: char, found: char },
+    #[error("No open bracket found for closing bracket `{close}`")]
+    NoOpenBracket { close: char },
 
-    #[error("No valid digits after numeric prefix `{prefix}`")]
-    NoValidDigitsAfterNumericPrefix { prefix: String },
+    #[error("Mismatched brackets found: expected `{expected}`, found `{found}`")]
+    MismatchedBrackets { expected: char, found: char },
 
-    #[error("Unknown symbol encountered `{symbol}`")]
+    #[error("No digits found after numeric prefix `{prefix}`")]
+    NoDigitsAfterNumericPrefix { prefix: String },
+
+    #[error("Unknown symbol found `{symbol}`")]
     UnknownSymbol { symbol: String },
 }
 
@@ -21,8 +24,11 @@ pub enum Token {
     /** end of the source code */
     Eof,
 
-    /** punctuations */
-    Punctuation { raw: char, kind: PunctuationKind },
+    /** brackets */
+    Bracket { raw: char, depth: usize, kind: BracketKind },
+
+    /** separators */
+    Separator { raw: char },
 
     /** numeric literals */
     Numeric { raw: String, prefix: String, suffix: String, kind: NumericKind },
@@ -35,10 +41,9 @@ pub enum Token {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum PunctuationKind {
-    Open(usize),
-    Close(usize),
-    Separator,
+pub enum BracketKind {
+    Open,
+    Close,
 }
 
 #[derive(Debug, PartialEq)]
@@ -84,15 +89,9 @@ impl<'a> Lexer<'a> {
         };
 
         match c {
-            c if Lexer::OPEN_BRACKETS.contains(&c) => Ok(Token::Punctuation {
-                raw: c,
-                kind: PunctuationKind::Open(self.push_bracket(c))
-            }),
-            c if Lexer::CLOSE_BRACKETS.contains(&c) => Ok(Token::Punctuation {
-                raw: c,
-                kind: PunctuationKind::Close(self.pop_bracket(c)?)
-            }),
-            c if Lexer::SEPARATORS.contains(&c) => Ok(Token::Punctuation { raw: c, kind: PunctuationKind::Separator }),
+            c if Lexer::OPEN_BRACKETS.contains(&c) => Ok(self.tokenize_open_bracket(c)),
+            c if Lexer::CLOSE_BRACKETS.contains(&c) => self.tokenize_close_bracket(c),
+            c if Lexer::SEPARATORS.contains(&c) => Ok(Token::Separator { raw: c }),
             '0'..='9' => self.tokenize_numeric(c),
             '.' => match self.curr.peek() {
                 Some(&c) if c.is_digit(10) => self.tokenize_numeric('.'),
@@ -104,25 +103,22 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn push_bracket(&mut self, c: char) -> usize {
+    fn tokenize_open_bracket(&mut self, c: char) -> Token {
         self.bracket_stack.push(c);
-        self.bracket_stack.len() - 1
+        Token::Bracket { raw: c, depth: self.bracket_stack.len() - 1, kind: BracketKind::Open }
     }
 
-    fn pop_bracket(&mut self, c: char) -> Result<usize, LexerError> {
+    fn tokenize_close_bracket(&mut self, c: char) -> Result<Token, LexerError> {
         match self.bracket_stack.last() {
             Some(&last) if Lexer::match_close_bracket(c).unwrap() == last => {
                 self.bracket_stack.pop();
-                Ok(self.bracket_stack.len())
+                Ok(Token::Bracket { raw: c, depth: self.bracket_stack.len(), kind: BracketKind::Close })
             },
-            Some(&last) => Err(LexerError::ImbalancedBrackets {
+            Some(&last) => Err(LexerError::MismatchedBrackets {
                 expected: Lexer::match_open_bracket(last).unwrap(),
                 found: c,
             }),
-            None => Err(LexerError::ImbalancedBrackets {
-                expected: ' ',
-                found: c,
-            }),
+            None => Err(LexerError::NoOpenBracket { close: c }),
         }
     }
 
@@ -161,7 +157,7 @@ impl<'a> Lexer<'a> {
                     raw.push(c);
                 },
                 Some(&c) if c.is_digit(radix) => raw.push(c),
-                _ => return Err(LexerError::NoValidDigitsAfterNumericPrefix { prefix }),
+                _ => return Err(LexerError::NoDigitsAfterNumericPrefix { prefix }),
             }
 
             self.curr.next();

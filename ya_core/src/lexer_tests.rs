@@ -10,46 +10,53 @@ fn eof() {
 fn basic_brackets() {
     let mut lexer = Lexer::new("() [] {}");
 
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '(', kind: PunctuationKind::Open(0) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: ')', kind: PunctuationKind::Close(0) }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '(', depth: 0, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: ')', depth: 0, kind: BracketKind::Close }));
 
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '[', kind: PunctuationKind::Open(0) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: ']', kind: PunctuationKind::Close(0) }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '[', depth: 0, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: ']', depth: 0, kind: BracketKind::Close }));
 
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '{', kind: PunctuationKind::Open(0) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '}', kind: PunctuationKind::Close(0) }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '{', depth: 0, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '}', depth: 0, kind: BracketKind::Close }));
 }
 
 #[test]
 fn nested_brackets() {
     let mut lexer = Lexer::new("([([])] {})");
 
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '(', kind: PunctuationKind::Open(0) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '[', kind: PunctuationKind::Open(1) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '(', kind: PunctuationKind::Open(2) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '[', kind: PunctuationKind::Open(3) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: ']', kind: PunctuationKind::Close(3) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: ')', kind: PunctuationKind::Close(2) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: ']', kind: PunctuationKind::Close(1) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '{', kind: PunctuationKind::Open(1) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '}', kind: PunctuationKind::Close(1) }));
-    assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: ')', kind: PunctuationKind::Close(0) }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '(', depth: 0, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '[', depth: 1, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '(', depth: 2, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '[', depth: 3, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: ']', depth: 3, kind: BracketKind::Close }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: ')', depth: 2, kind: BracketKind::Close }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: ']', depth: 1, kind: BracketKind::Close }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '{', depth: 1, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '}', depth: 1, kind: BracketKind::Close }));
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: ')', depth: 0, kind: BracketKind::Close }));
+}
+
+#[test]
+fn separators() {
+    let mut lexer = Lexer::new("; ,");
+
+    assert_eq!(lexer.next_token(), Ok(Token::Separator { raw: ';' }));
+    assert_eq!(lexer.next_token(), Ok(Token::Separator { raw: ',' }));
+}
+
+#[test]
+fn missing_opening_bracket() {
+    let mut lexer = Lexer::new("}");
+
+    assert_eq!(lexer.next_token(), Err(LexerError::NoOpenBracket { close: '}' }));
 }
 
 #[test]
 fn imbalanced_brackets() {
-    { // no opening bracket
-        let mut lexer = Lexer::new("}");
+    let mut lexer = Lexer::new("(}");
 
-        assert_eq!(lexer.next_token(), Err(LexerError::ImbalancedBrackets { expected: ' ', found: '}' }));
-    }
-
-    { // mismatch brackets
-        let mut lexer = Lexer::new("(}");
-
-        assert_eq!(lexer.next_token(), Ok(Token::Punctuation { raw: '(', kind: PunctuationKind::Open(0) }));
-        assert_eq!(lexer.next_token(), Err(LexerError::ImbalancedBrackets { expected: ')', found: '}' }));
-    }
+    assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '(', depth: 0, kind: BracketKind::Open }));
+    assert_eq!(lexer.next_token(), Err(LexerError::MismatchedBrackets { expected: ')', found: '}' }));
 }
 
 #[test]
@@ -148,15 +155,15 @@ fn radices() {
 }
 
 #[test]
-fn no_valid_digits_after_numeric_prefix() {
+fn missing_valid_digits_after_numeric_prefix() {
     { // empty after prefix
         let mut lexer = Lexer::new("0x");
-        assert_eq!(lexer.next_token(), Err(LexerError::NoValidDigitsAfterNumericPrefix { prefix: "0x".to_owned() }));
+        assert_eq!(lexer.next_token(), Err(LexerError::NoDigitsAfterNumericPrefix { prefix: "0x".to_owned() }));
     }
 
     { // invalid digit after prefix
         let mut lexer = Lexer::new("0xzz");
-        assert_eq!(lexer.next_token(), Err(LexerError::NoValidDigitsAfterNumericPrefix { prefix: "0x".to_owned() }));
+        assert_eq!(lexer.next_token(), Err(LexerError::NoDigitsAfterNumericPrefix { prefix: "0x".to_owned() }));
         assert_eq!(lexer.next_token(), Ok(Token::Identifier { raw: "zz".to_owned() }));
     }
 }
