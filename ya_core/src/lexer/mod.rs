@@ -1,8 +1,7 @@
 use thiserror::Error;
 
 #[cfg(test)]
-#[path = "lexer_tests.rs"]
-mod lexer_tests;
+mod tests;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum LexerError {
@@ -62,10 +61,10 @@ pub enum NumericKind {
 }
 
 pub struct Lexer<'a> {
-    pub src: &'a str,
-    pub curr: std::iter::Peekable<std::str::Chars<'a>>,
+    curr: std::iter::Peekable<std::str::Chars<'a>>,
+    bracket_stack: Vec<char>,
 
-    bracket_stack: std::vec::Vec<char>,
+    peeked: Option<Result<Token, LexerError>>,
 }
 
 impl<'a> Lexer<'a> {
@@ -78,16 +77,30 @@ impl<'a> Lexer<'a> {
 
     pub fn new(src: &'a str) -> Self {
         Lexer {
-            src,
             curr: src.chars().peekable(),
-
             bracket_stack: vec![],
+
+            peeked: None,
         }
+    }
+
+    pub fn peek_token(&mut self) -> &Result<Token, LexerError> {
+        if self.peeked.is_none() {
+            self.ignore_whitespaces();
+            self.peeked = Some(self.to_token());
+        }
+
+        self.peeked.as_ref().unwrap()
     }
 
     pub fn next_token(&mut self) -> Result<Token, LexerError> {
         self.ignore_whitespaces();
-        self.to_token()
+
+        if self.peeked.is_none() {
+            self.to_token()
+        } else {
+            self.peeked.take().unwrap()
+        }
     }
 
     fn to_token(&mut self) -> Result<Token, LexerError> {

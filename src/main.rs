@@ -3,14 +3,25 @@ extern crate ya_core;
 use ya_core::*;
 
 fn main() {
-    let mut lexer = lexer::Lexer::new("() ({([] )} {}) 0o1234567890abcdefg");
+    let src = std::fs::read_to_string("ya_core/examples/hello_world.ya").unwrap();
 
-    loop {
-        let tok = lexer.next_token();
-        println!("{:?}", tok);
+    let mut parser = parser::Parser::new(&src);
 
-        if let Ok(lexer::Token::Eof) = tok {
-            break;
-        }
-    }
+    parser.parse_item();
+
+    println!("{:#?}", parser.items);
+    println!("{:#?}", parser.errs);
 }
+
+// fn main() {
+//     let src = std::fs::read_to_string("ya_core/examples/hello_world.ya").unwrap();
+//     let mut lexer = lexer::Lexer::new(&src);
+    
+//     loop {
+//         lexer.peek_token();
+//         match lexer.next_token() {
+//             Ok(lexer::Token::Eof) => break,
+//             tok => println!("{:?}", tok),
+//         }
+//     }
+// }
