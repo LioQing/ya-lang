@@ -7,7 +7,8 @@ fn main() {
 
     let mut parser = parser::Parser::new(&src);
 
-    parser.parse_item();
+    parser.parse_item_decl();
+    parser.parse_item_def();
 
     println!("{:#?}", parser.items);
     println!("{:#?}", parser.errs);

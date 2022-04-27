@@ -3,7 +3,7 @@ use thiserror::Error;
 #[cfg(test)]
 mod tests;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Clone)]
 pub enum LexerError {
     #[error("No open bracket found for closing bracket `{close}`")]
     NoOpeningBracket { close: char },
@@ -24,7 +24,7 @@ pub enum LexerError {
     UnknownSymbol { symbol: String },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     /** end of the source code */
     Eof,
@@ -48,18 +48,19 @@ pub enum Token {
     Identifier { raw: String },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BracketKind {
     Open,
     Close,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum NumericKind {
     Integer,
     Float { dot_pos: Option<usize>, exp_pos: Option<usize> },
 }
 
+#[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     curr: std::iter::Peekable<std::str::Chars<'a>>,
     bracket_stack: Vec<char>,
@@ -84,13 +85,23 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn peek_token(&mut self) -> &Result<Token, LexerError> {
+    pub fn skip(&mut self, n: usize) {
+        (0..n).for_each(|_| { self.next_token().ok(); });
+    }
+
+    pub fn peek_token(&mut self) -> Result<&Token, LexerError> {
         if self.peeked.is_none() {
             self.ignore_whitespaces();
             self.peeked = Some(self.to_token());
         }
 
-        self.peeked.as_ref().unwrap()
+        match self.peeked {
+            Some(ref peeked) => match peeked {
+                Ok(token) => Ok(&token),
+                Err(err) => Err(err.clone()),
+            },
+            None => unreachable!(),
+        }
     }
 
     pub fn next_token(&mut self) -> Result<Token, LexerError> {
@@ -100,6 +111,14 @@ impl<'a> Lexer<'a> {
             self.to_token()
         } else {
             self.peeked.take().unwrap()
+        }
+    }
+
+    pub fn curr_bracket_depth(&self) -> usize {
+        if let Some(Ok(Token::Bracket { depth, kind: BracketKind::Open, .. })) = self.peeked {
+            depth
+        } else {
+            self.bracket_stack.len()
         }
     }
 

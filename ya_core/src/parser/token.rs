@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(strum::EnumString, strum::AsRefStr, Debug, PartialEq)]
+#[derive(strum::EnumString, strum::AsRefStr, Debug, PartialEq, Clone)]
 #[strum(serialize_all = "snake_case")]
 pub enum Keyword {
     Func,
@@ -8,23 +8,40 @@ pub enum Keyword {
 }
 
 impl Keyword {
+    pub fn peek_parse(lexer: &mut lexer::Lexer, keywords: &[&str]) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::Identifier { raw } if keywords.contains(&raw.as_str()) => Ok(Keyword::from_str(raw.as_str())?),
+            found => Err(ParserError::ExpectedKeyword {
+                expected: keywords.iter().map(|s| s.to_string()).collect(),
+                found: found.clone(),
+            }),
+        }
+    }
+
     pub fn parse(lexer: &mut lexer::Lexer, keywords: &[&str]) -> Result<Self, ParserError> {
         match lexer.next_token()? {
             lexer::Token::Identifier { raw } if keywords.contains(&raw.as_str()) => Ok(Keyword::from_str(&raw)?),
             found => Err(ParserError::ExpectedKeyword {
                 expected: keywords.iter().map(|s| s.to_string()).collect(),
-                found
+                found,
             }),
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FuncName {
     pub name: String,
 }
 
 impl FuncName {
+    pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::Identifier { raw } => Ok(FuncName { name: raw.clone() }),
+            found => return Err(ParserError::ExpectedIdentifier { found: found.clone()}),
+        }
+    }
+
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         match lexer.next_token()? {
             lexer::Token::Identifier { raw } => Ok(FuncName { name: raw }),
@@ -33,12 +50,19 @@ impl FuncName {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct VarName {
     pub name: String,
 }
 
 impl VarName {
+    pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::Identifier { raw } => Ok(VarName { name: raw.clone() }),
+            found => return Err(ParserError::ExpectedIdentifier { found: found.clone()}),
+        }
+    }
+
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         match lexer.next_token()? {
             lexer::Token::Identifier { raw } => Ok(VarName { name: raw }),
@@ -64,10 +88,26 @@ pub enum PrimType {
     Bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TypeName {
     PrimType(PrimType),
     Struct(String),
+}
+
+impl TypeName {
+    pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::Identifier { raw } => Ok(TypeName::from_str(&raw).unwrap()),
+            found => return Err(ParserError::ExpectedIdentifier { found: found.clone() }),
+        }
+    }
+
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        match lexer.next_token()? {
+            lexer::Token::Identifier { raw } => Ok(TypeName::from_str(&raw).unwrap()),
+            found => return Err(ParserError::ExpectedIdentifier { found }),
+        }
+    }
 }
 
 impl std::str::FromStr for TypeName {
@@ -78,6 +118,33 @@ impl std::str::FromStr for TypeName {
             Ok(TypeName::PrimType(prim_type))
         } else {
             Ok(TypeName::Struct(s.to_string()))
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Operator {
+    pub op: String,
+}
+
+impl Operator {
+    pub fn peek_parse(lexer: &mut lexer::Lexer, ops: &[&str]) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::Operator { raw } if ops.contains(&raw.as_str()) => Ok(Operator { op: raw.clone() }),
+            found => Err(ParserError::ExpectedOperator {
+                expected: ops.iter().map(|s| s.to_string()).collect(),
+                found: found.clone(),
+            }),
+        }
+    }
+
+    pub fn parse(lexer: &mut lexer::Lexer, ops: &[&str]) -> Result<Self, ParserError> {
+        match lexer.next_token()? {
+            lexer::Token::Operator { raw } if ops.contains(&raw.as_str()) => Ok(Operator { op: raw }),
+            found => Err(ParserError::ExpectedOperator {
+                expected: ops.iter().map(|s| s.to_string()).collect(),
+                found,
+            }),
         }
     }
 }
@@ -128,107 +195,172 @@ impl Bracket {
             _ => panic!("Bracket::from_close_char: unexpected char: {}", c),
         }
     }
-}
 
-#[derive(Debug, PartialEq)]
-pub struct Bracketed<T> {
-    pub inner: T,
-    pub bracket: Bracket,
-}
-
-impl<T> Bracketed<T> {
-    pub fn parse<F>(lexer: &mut lexer::Lexer, brackets: &[Bracket], f: F) -> Result<Self, ParserError>
-    where
-        F: Fn(&mut lexer::Lexer) -> Result<T, ParserError>
-    {
-        let bracket = match lexer.next_token()? {
+    pub fn peek_parse_open(lexer: &mut lexer::Lexer, brackets: &[Bracket]) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
             lexer::Token::Bracket {
                 raw,
                 kind: lexer::BracketKind::Open,
                 ..
-            } if brackets.iter().any(|b| b.to_open_char() == raw) => Bracket::from_open_char(raw),
-            found => return Err(ParserError::ExpectedSymbol {
-                expected: brackets.iter().map(|b| b.to_open_char().to_string()).collect(),
-                found
+            } if brackets.contains(&Bracket::from_open_char(*raw)) => {
+                Ok(Bracket::from_open_char(*raw))
+            },
+            found => Err(ParserError::ExpectedSymbol {
+                expected: brackets
+                    .iter()
+                    .map(|b| b.to_open_char().to_string())
+                    .collect(),
+                found: found.clone(),
             }),
-        };
+        }
+    }
 
-        let inner = f(lexer)?;
+    pub fn peek_parse_close(lexer: &mut lexer::Lexer, brackets: &[Bracket]) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::Bracket {
+                raw,
+                kind: lexer::BracketKind::Close,
+                ..
+            } if brackets.contains(&Bracket::from_close_char(*raw)) => {
+                Ok(Bracket::from_close_char(*raw))
+            },
+            found => Err(ParserError::ExpectedBracket {
+                expected: brackets
+                    .iter()
+                    .map(|b| b.to_open_char())
+                    .collect(),
+                found: found.clone(),
+            }),
+        }
+    }
 
+    pub fn parse_open(lexer: &mut lexer::Lexer, brackets: &[Bracket]) -> Result<Self, ParserError> {
+        match lexer.next_token()? {
+            lexer::Token::Bracket {
+                raw,
+                kind: lexer::BracketKind::Open,
+                ..
+            } if brackets.contains(&Bracket::from_open_char(raw)) => {
+                Ok(Bracket::from_open_char(raw))
+            },
+            found => Err(ParserError::ExpectedSymbol {
+                expected: brackets
+                    .iter()
+                    .map(|b| b.to_open_char().to_string())
+                    .collect(),
+                found,
+            }),
+        }
+    }
+
+    pub fn parse_close(lexer: &mut lexer::Lexer, brackets: &[Bracket]) -> Result<Self, ParserError> {
         match lexer.next_token()? {
             lexer::Token::Bracket {
                 raw,
                 kind: lexer::BracketKind::Close,
                 ..
-            } if bracket.to_close_char() == raw => {
-                Ok(Bracketed {
-                    inner,
-                    bracket,
-                })
+            } if brackets.contains(&Bracket::from_close_char(raw)) => {
+                Ok(Bracket::from_close_char(raw))
             },
             found => Err(ParserError::ExpectedBracket {
-                expected: vec![bracket.to_close_char().to_string()],
-                found
+                expected: brackets
+                    .iter()
+                    .map(|b| b.to_open_char())
+                    .collect(),
+                found,
             }),
         }
     }
-}
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum Separator {
-    Comma,
-    Semicolon,
-}
-
-impl Into<char> for Separator {
-    fn into(self) -> char {
-        match self {
-            Separator::Comma => ',',
-            Separator::Semicolon => ';',
+    pub fn peek_parse_open_with_depth(
+        lexer: &mut lexer::Lexer,
+        brackets: &[Bracket],
+        depth: usize
+    ) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::Bracket {
+                raw,
+                depth: d,
+                kind: lexer::BracketKind::Open,
+            } if brackets.contains(&Bracket::from_open_char(*raw)) && *d == depth => {
+                Ok(Bracket::from_open_char(*raw))
+            },
+            found => Err(ParserError::ExpectedSymbol {
+                expected: brackets
+                    .iter()
+                    .map(|b| b.to_open_char().to_string())
+                    .collect(),
+                found: found.clone(),
+            }),
         }
     }
-}
 
-impl From<char> for Separator {
-    fn from(c: char) -> Self {
-        match c {
-            ',' => Separator::Comma,
-            ';' => Separator::Semicolon,
-            _ => panic!("Separator::from: unexpected char: {}", c),
+    pub fn peek_parse_close_with_depth(
+        lexer: &mut lexer::Lexer,
+        brackets: &[Bracket],
+        depth: usize
+    ) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::Bracket {
+                raw,
+                depth: d,
+                kind: lexer::BracketKind::Close,
+            } if brackets.contains(&Bracket::from_close_char(*raw)) && *d == depth => {
+                Ok(Bracket::from_close_char(*raw))
+            },
+            found => Err(ParserError::ExpectedBracket {
+                expected: brackets
+                    .iter()
+                    .map(|b| b.to_open_char())
+                    .collect(),
+                found: found.clone(),
+            }),
         }
     }
-}
 
-#[derive(Debug, PartialEq)]
-pub struct Separated<T> {
-    pub content: Vec<T>,
-    pub separator: Separator,
-}
-
-impl<T> Separated<T> {
-    pub fn parse<F>(lexer: &mut lexer::Lexer, sep: Separator, parse: F) -> Result<Self, ParserError>
-    where
-        F: Fn(&mut lexer::Lexer) -> (Result<T, ParserError>, bool)
-    {
-        let mut content = Vec::new();
-
-        loop {
-            let (res, cont) = parse(lexer);
-            content.push(res?);
-
-            if !cont {
-                break;
-            }
-
-            match lexer.next_token()? {
-                lexer::Token::Separator { raw } if raw == sep.into() => {},
-                found => return Err(ParserError::ExpectedSeparator { expected: sep.into(), found }),
-            }
+    pub fn parse_open_with_depth(
+        lexer: &mut lexer::Lexer,
+        brackets: &[Bracket],
+        depth: usize
+    ) -> Result<Self, ParserError> {
+        match lexer.next_token()? {
+            lexer::Token::Bracket {
+                raw,
+                depth: d,
+                kind: lexer::BracketKind::Open,
+            } if brackets.contains(&Bracket::from_open_char(raw)) && d == depth => {
+                Ok(Bracket::from_open_char(raw))
+            },
+            found => Err(ParserError::ExpectedSymbol {
+                expected: brackets
+                    .iter()
+                    .map(|b| b.to_open_char().to_string())
+                    .collect(),
+                found,
+            }),
         }
+    }
 
-        Ok(Separated {
-            content,
-            separator: sep,
-        })
+    pub fn parse_close_with_depth(
+        lexer: &mut lexer::Lexer,
+        brackets: &[Bracket],
+        depth: usize
+    ) -> Result<Self, ParserError> {
+        match lexer.next_token()? {
+            lexer::Token::Bracket {
+                raw,
+                depth: d,
+                kind: lexer::BracketKind::Close,
+            } if brackets.contains(&Bracket::from_close_char(raw)) && d == depth => {
+                Ok(Bracket::from_close_char(raw))
+            },
+            found => Err(ParserError::ExpectedBracket {
+                expected: brackets
+                    .iter()
+                    .map(|b| b.to_open_char())
+                    .collect(),
+                found,
+            }),
+        }
     }
 }

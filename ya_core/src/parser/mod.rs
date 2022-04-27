@@ -6,11 +6,13 @@ use std::str::FromStr;
 mod tests;
 
 pub mod item;
+pub mod stmt;
 pub mod expr;
 pub mod construct;
 pub mod token;
 
 pub use expr::*;
+pub use stmt::*;
 pub use construct::*;
 pub use item::*;
 
@@ -22,6 +24,12 @@ pub enum ParserError {
     #[error("Enum parse error: {0}")]
     StrumEnumParse(#[from] strum::ParseError),
 
+    #[error("Expected expression, found {found}")]
+    ExpectedExpr { found: String },
+
+    #[error("Expected primary expression, found {found}")]
+    ExpectedPrimExpr { found: String },
+
     #[error("Expected identifier, found {found:?}")]
     ExpectedIdentifier { found: lexer::Token },
 
@@ -32,13 +40,19 @@ pub enum ParserError {
     ExpectedSymbol { expected: Vec<String>, found: lexer::Token },
 
     #[error("Expected bracket: {expected:?}, found {found:?}")]
-    ExpectedBracket { expected: Vec<String>, found: lexer::Token },
+    ExpectedBracket { expected: Vec<char>, found: lexer::Token },
 
     #[error("Expected separator: {expected}, found {found:?}")]
     ExpectedSeparator { expected: char, found: lexer::Token },
 
+    #[error("Expected operator: {expected:?}, found {found:?}")]
+    ExpectedOperator { expected: Vec<String>, found: lexer::Token },
+
     #[error("Expected parameter declaration in format of `[identifier]: [type]`, found {found:?}")]
     ExpectedParamDecl { found: (lexer::Token, lexer::Token, lexer::Token) },
+
+    #[error("Variable name `{name}` not found")]
+    VarNameNotFound { name: String },
 
     #[error("Unknown token {token:?} in global scope")]
     UnknownTokenInGlobalScope { token: lexer::Token },
@@ -59,19 +73,37 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_item(&mut self) {
+    pub fn parse_item_def(&mut self) {
         let mut lexer = lexer::Lexer::new(self.src);
 
         loop {
-            match self.next_item(&mut lexer) {
+            match Item::parse(&mut lexer) {
                 Ok(Item::Eof) => break,
-                Ok(i) => self.items.push(i),
                 Err(e) => self.errs.push(e),
+                Ok(Item::Func(f)) => {
+                    match self.items
+                        .iter_mut()
+                        .find(|i| matches!(i, Item::Func(fi) if fi.proto.sign == f.proto.sign))
+                    {
+                        Some(Item::Func(fi)) if fi.proto.sign == f.proto.sign => {
+                            fi.body = f.body;
+                        },
+                        _ => unreachable!(),
+                    };
+                },
             }
         }
     }
 
-    pub fn next_item(&mut self, lexer: &mut lexer::Lexer) -> Result<Item, ParserError> {
-        Item::parse(lexer)
+    pub fn parse_item_decl(&mut self) {
+        let mut lexer = lexer::Lexer::new(self.src);
+
+        loop {
+            match Item::parse_decl(&mut lexer) {
+                Ok(Item::Eof) => break,
+                Err(e) => self.errs.push(e),
+                Ok(i) => self.items.push(i),
+            }
+        }
     }
 }

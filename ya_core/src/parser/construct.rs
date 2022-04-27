@@ -1,6 +1,95 @@
 use super::*;
 
 #[derive(Debug, PartialEq)]
+pub struct Bracketed<T> {
+    pub bracket: token::Bracket,
+    pub inner: T,
+}
+
+impl<T> Bracketed<T> {
+    pub fn parse<F>(lexer: &mut lexer::Lexer, brackets: &[token::Bracket], f: F) -> Result<Self, ParserError>
+    where
+        F: Fn(&mut lexer::Lexer) -> Result<T, ParserError>
+    {
+        let bracket = token::Bracket::parse_open(lexer, brackets)?;
+
+        let inner = f(lexer)?;
+
+        token::Bracket::parse_close(lexer, &[bracket])?;
+
+        Ok(Bracketed {
+            bracket,
+            inner,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum Separator {
+    Comma,
+    Semicolon,
+}
+
+impl Into<char> for Separator {
+    fn into(self) -> char {
+        match self {
+            Separator::Comma => ',',
+            Separator::Semicolon => ';',
+        }
+    }
+}
+
+impl From<char> for Separator {
+    fn from(c: char) -> Self {
+        match c {
+            ',' => Separator::Comma,
+            ';' => Separator::Semicolon,
+            _ => panic!("Separator::from: unexpected char: {}", c),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Separated<T> {
+    pub separator: Separator,
+    pub content: Vec<T>,
+}
+
+pub enum SepRes<T> {
+    Cont(T),
+    Stop(T),
+}
+
+impl<T> Separated<T> {
+    pub fn parse<F>(lexer: &mut lexer::Lexer, sep: Separator, parse: F) -> Result<Self, ParserError>
+    where
+        F: Fn(&mut lexer::Lexer) -> Result<SepRes<T>, ParserError>
+    {
+        let mut content = Vec::new();
+
+        loop {
+            match parse(lexer)? {
+                SepRes::Cont(c) => content.push(c),
+                SepRes::Stop(c) => {
+                    content.push(c);
+                    break;
+                }
+            }
+
+            match lexer.next_token()? {
+                lexer::Token::Separator { raw } if raw == sep.into() => {},
+                found => return Err(ParserError::ExpectedSeparator { expected: sep.into(), found }),
+            }
+        }
+
+        Ok(Separated {
+            content,
+            separator: sep,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Param {
     pub name: token::VarName,
     pub ty: token::TypeName,
@@ -8,30 +97,21 @@ pub struct Param {
 
 impl Param {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
-        match (lexer.next_token()?, lexer.next_token()?, lexer.next_token()?) {
-            (
-                lexer::Token::Identifier { raw: param_name },
-                lexer::Token::Operator { raw: op },
-                lexer::Token::Identifier { raw: ty },
-            ) if op == ":" => {
-                Ok(Param {
-                    name: token::VarName { name: param_name },
-                    ty: token::TypeName::from_str(&ty).unwrap(),
-                })
-            }
-            found => return Err(ParserError::ExpectedParamDecl { found }),
-        }
+        let name = token::VarName::parse(lexer)?;
+        token::Operator::parse(lexer, &[":"])?;
+        let ty = token::TypeName::parse(lexer)?;
+
+        Ok(Param { name, ty })
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub struct FuncDecl {
+pub struct FuncSign {
     pub name: token::FuncName,
-    pub params: token::Bracketed<token::Separated<Param>>,
-    pub ret_ty: token::TypeName,
+    pub params: Vec<Param>,
 }
 
-impl FuncDecl {
+impl FuncSign {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         // keyword `func`
         token::Keyword::parse(lexer, &["func"])?;
@@ -40,66 +120,54 @@ impl FuncDecl {
         let name = token::FuncName::parse(lexer)?;
 
         // parameters
-        let params = token::Bracketed::parse(lexer, &[token::Bracket::Round], 
-        |lexer| token::Separated::parse(lexer, token::Separator::Comma,
-        |lexer| {
-            match lexer.peek_token() {
-                Err(_) => (Err(ParserError::Lexer(lexer.next_token().err().unwrap())), false),
-                _ => (Param::parse(lexer), match lexer.peek_token() {
-                    Err(_) => return (Err(ParserError::Lexer(lexer.next_token().err().unwrap())), false),
-                    Ok(lexer::Token::Bracket { raw: ')', kind: lexer::BracketKind::Close, .. }) => false,
-                    _ => true,
-                }),
+        let params = Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
+            if let Ok(_) = token::Bracket::peek_parse_close(lexer, &[token::Bracket::Round]) {
+                return Ok(Separated {
+                    separator: Separator::Comma,
+                    content: vec![],
+                });
             }
-        }))?;
 
-        // match lexer.next_token()? {
-        //     lexer::Token::Bracket { raw: '(', kind: lexer::BracketKind::Open, .. } => {},
-        //     found => return Err(ParserError::ExpectedSymbol { expected: vec!['('.to_string()], found }),
-        // }
+            Separated::parse(lexer, Separator::Comma, |lexer| {
+                let param = Param::parse(lexer)?;
 
-        // let mut params = Vec::<Param>::new();
-        // if let Err(_) | Ok(lexer::Token::Bracket { raw: ')', kind: lexer::BracketKind::Close, .. }) = lexer.peek_token() {
-        //     lexer.next_token()?;
-        // } else {
-        //     loop {
-        //         params.push(Param::parse(lexer)?);
+                match lexer.peek_token() {
+                    Err(_) => {
+                        Err(ParserError::Lexer(lexer.next_token().err().unwrap()))
+                    },
+                    Ok(lexer::Token::Bracket { raw: ')', kind: lexer::BracketKind::Close, .. }) => {
+                        Ok(SepRes::Stop(param))
+                    },
+                    _ => {
+                        Ok(SepRes::Cont(param))
+                    },
+                }
+            })
+        })?.inner.content;
 
-        //         match lexer.next_token()? {
-        //             lexer::Token::Separator { raw: ',' } => {},
-        //             lexer::Token::Bracket { raw: ')', kind: lexer::BracketKind::Close, .. } => break,
-        //             found => return Err(ParserError::ExpectedSymbol {
-        //                 expected: vec![','.to_string(), ')'.to_string()],
-        //                 found
-        //             }),
-        //         }
-        //     }
-        // }
+        Ok(FuncSign { name, params })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FuncProto {
+    pub sign: FuncSign,
+    pub ret_ty: token::TypeName,
+}
+
+impl FuncProto {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        // sign
+        let sign = FuncSign::parse(lexer)?;
 
         // return type
-        let ret_ty = match lexer.peek_token() {
-            Ok(lexer::Token::Operator { raw }) if raw.as_str() == "->" => {
-                lexer.next_token().unwrap();
-                match lexer.next_token()? {
-                    lexer::Token::Identifier { raw } => token::TypeName::from_str(&raw).unwrap(),
-                    found => return Err(ParserError::ExpectedIdentifier { found }),
-                }
-            },
-            Ok(lexer::Token::Bracket { raw: '{', kind: lexer::BracketKind::Open, .. }) => {
-                token::TypeName::PrimType(token::PrimType::Unit)
-            },
-            _ => {
-                return Err(ParserError::ExpectedSymbol {
-                    expected: vec!["->".to_owned(), "{".to_owned()],
-                    found: lexer.next_token()?
-                });
-            },
+        let ret_ty = if let Ok(_) = token::Operator::peek_parse(lexer, &["->"]) {
+            token::Operator::parse(lexer, &["->"]).unwrap();
+            token::TypeName::parse(lexer)?
+        } else {
+            token::TypeName::PrimType(token::PrimType::Unit)
         };
 
-        Ok(FuncDecl {
-            name,
-            params,
-            ret_ty,
-        })
+        Ok(FuncProto { sign, ret_ty })
     }
 }
