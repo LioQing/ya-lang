@@ -57,7 +57,7 @@ impl Stmt {
 pub struct LetStmt {
     pub var: token::VarName,
     pub ty: Option<token::TypeName>,
-    pub expr: Option<Expr>,
+    pub expr: Option<Box<Expr>>,
 }
 
 impl LetStmt {
@@ -74,7 +74,7 @@ impl LetStmt {
 
         let expr = if let Ok(_) = token::Operator::peek_parse(lexer, &["="]) {
             token::Operator::parse(lexer, &["="]).unwrap();
-            Some(Expr::parse(lexer)?)
+            Some(Box::new(Expr::parse(lexer)?))
         } else {
             None
         };

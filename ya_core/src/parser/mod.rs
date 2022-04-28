@@ -36,7 +36,7 @@ pub enum ParserError {
     #[error("Expected keyword: {expected:?}, found {found:?}")]
     ExpectedKeyword { expected: Vec<String>, found: lexer::Token },
 
-    #[error("Expected symbols: {expected:?}, found {found:?}")]
+    #[error("Expected symbol: {expected:?}, found {found:?}")]
     ExpectedSymbol { expected: Vec<String>, found: lexer::Token },
 
     #[error("Expected bracket: {expected:?}, found {found:?}")]
@@ -48,11 +48,11 @@ pub enum ParserError {
     #[error("Expected operator: {expected:?}, found {found:?}")]
     ExpectedOperator { expected: Vec<String>, found: lexer::Token },
 
+    #[error("Expected literal, found {found:?}")]
+    ExpectedLiteral { found: lexer::Token },
+
     #[error("Expected parameter declaration in format of `[identifier]: [type]`, found {found:?}")]
     ExpectedParamDecl { found: (lexer::Token, lexer::Token, lexer::Token) },
-
-    #[error("Variable name `{name}` not found")]
-    VarNameNotFound { name: String },
 
     #[error("Unknown token {token:?} in global scope")]
     UnknownTokenInGlobalScope { token: lexer::Token },
@@ -73,33 +73,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_item_def(&mut self) {
+    pub fn parse_items(&mut self) {
         let mut lexer = lexer::Lexer::new(self.src);
 
         loop {
             match Item::parse(&mut lexer) {
-                Ok(Item::Eof) => break,
-                Err(e) => self.errs.push(e),
-                Ok(Item::Func(f)) => {
-                    match self.items
-                        .iter_mut()
-                        .find(|i| matches!(i, Item::Func(fi) if fi.proto.sign == f.proto.sign))
-                    {
-                        Some(Item::Func(fi)) if fi.proto.sign == f.proto.sign => {
-                            fi.body = f.body;
-                        },
-                        _ => unreachable!(),
-                    };
-                },
-            }
-        }
-    }
-
-    pub fn parse_item_decl(&mut self) {
-        let mut lexer = lexer::Lexer::new(self.src);
-
-        loop {
-            match Item::parse_decl(&mut lexer) {
                 Ok(Item::Eof) => break,
                 Err(e) => self.errs.push(e),
                 Ok(i) => self.items.push(i),

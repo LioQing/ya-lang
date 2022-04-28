@@ -21,7 +21,7 @@ impl Expr {
             Ok(lexer::Token::Bracket { raw: '{', .. }) => {
                 Ok(Expr::Block(ExprBlock::parse(lexer)?))
             },
-            Ok(lexer::Token::Identifier { .. }) => {
+            Ok(token) if PrimExpr::is_prim_expr(token) => {
                 Ok(Expr::Prim(PrimExpr::parse(lexer)?))
             }
             _ => {
@@ -33,13 +33,30 @@ impl Expr {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum PrimExpr {
+    Literal(token::Literal),
     VarName(token::VarName),
 }
 
 impl PrimExpr {
+    pub fn is_prim_expr(token: &lexer::Token) -> bool {
+        match token {
+            lexer::Token::StringChar { .. } |
+            lexer::Token::Numeric { .. } | 
+            lexer::Token::Identifier { .. } => {
+                true
+            },
+            _ => {
+                false
+            },
+        }
+    }
+
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
-        match lexer.peek_token() {
-            Ok(lexer::Token::Identifier { .. }) => {
+        match lexer.peek_token()? {
+            lexer::Token::StringChar { .. } | lexer::Token::Numeric { .. } => {
+                Ok(PrimExpr::Literal(token::Literal::parse(lexer)?))
+            },
+            lexer::Token::Identifier { .. } => {
                 Ok(PrimExpr::VarName(token::VarName::parse(lexer)?))
             },
             _ => {

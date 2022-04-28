@@ -205,10 +205,10 @@ impl Bracket {
             } if brackets.contains(&Bracket::from_open_char(*raw)) => {
                 Ok(Bracket::from_open_char(*raw))
             },
-            found => Err(ParserError::ExpectedSymbol {
+            found => Err(ParserError::ExpectedBracket {
                 expected: brackets
                     .iter()
-                    .map(|b| b.to_open_char().to_string())
+                    .map(|b| b.to_open_char())
                     .collect(),
                 found: found.clone(),
             }),
@@ -227,7 +227,7 @@ impl Bracket {
             found => Err(ParserError::ExpectedBracket {
                 expected: brackets
                     .iter()
-                    .map(|b| b.to_open_char())
+                    .map(|b| b.to_close_char())
                     .collect(),
                 found: found.clone(),
             }),
@@ -243,10 +243,10 @@ impl Bracket {
             } if brackets.contains(&Bracket::from_open_char(raw)) => {
                 Ok(Bracket::from_open_char(raw))
             },
-            found => Err(ParserError::ExpectedSymbol {
+            found => Err(ParserError::ExpectedBracket {
                 expected: brackets
                     .iter()
-                    .map(|b| b.to_open_char().to_string())
+                    .map(|b| b.to_open_char())
                     .collect(),
                 found,
             }),
@@ -265,7 +265,7 @@ impl Bracket {
             found => Err(ParserError::ExpectedBracket {
                 expected: brackets
                     .iter()
-                    .map(|b| b.to_open_char())
+                    .map(|b| b.to_close_char())
                     .collect(),
                 found,
             }),
@@ -285,10 +285,10 @@ impl Bracket {
             } if brackets.contains(&Bracket::from_open_char(*raw)) && *d == depth => {
                 Ok(Bracket::from_open_char(*raw))
             },
-            found => Err(ParserError::ExpectedSymbol {
+            found => Err(ParserError::ExpectedBracket {
                 expected: brackets
                     .iter()
-                    .map(|b| b.to_open_char().to_string())
+                    .map(|b| b.to_open_char())
                     .collect(),
                 found: found.clone(),
             }),
@@ -311,7 +311,7 @@ impl Bracket {
             found => Err(ParserError::ExpectedBracket {
                 expected: brackets
                     .iter()
-                    .map(|b| b.to_open_char())
+                    .map(|b| b.to_close_char())
                     .collect(),
                 found: found.clone(),
             }),
@@ -331,10 +331,10 @@ impl Bracket {
             } if brackets.contains(&Bracket::from_open_char(raw)) && d == depth => {
                 Ok(Bracket::from_open_char(raw))
             },
-            found => Err(ParserError::ExpectedSymbol {
+            found => Err(ParserError::ExpectedBracket {
                 expected: brackets
                     .iter()
-                    .map(|b| b.to_open_char().to_string())
+                    .map(|b| b.to_open_char())
                     .collect(),
                 found,
             }),
@@ -357,10 +357,84 @@ impl Bracket {
             found => Err(ParserError::ExpectedBracket {
                 expected: brackets
                     .iter()
-                    .map(|b| b.to_open_char())
+                    .map(|b| b.to_close_char())
                     .collect(),
                 found,
             }),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum LiteralKind {
+    String,
+    Char,
+    Integer,
+    Float,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Literal {
+    pub value: String,
+    pub prefix: String,
+    pub suffix: String,
+    pub kind: LiteralKind,
+}
+
+impl Literal {
+    pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        match lexer.peek_token()? {
+            lexer::Token::StringChar { raw, prefix, suffix, quote: '"' } => {
+                Ok(Literal {
+                    value: raw.clone(),
+                    prefix: prefix.clone(),
+                    suffix: suffix.clone(),
+                    kind: LiteralKind::String,
+                })
+            },
+            lexer::Token::StringChar { raw, prefix, suffix, quote: '\'' } => {
+                Ok(Literal {
+                    value: raw.clone(),
+                    prefix: prefix.clone(),
+                    suffix: suffix.clone(),
+                    kind: LiteralKind::Char,
+                })
+            },
+            lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Integer } => {
+                Ok(Literal {
+                    value: raw.clone(),
+                    prefix: prefix.clone(),
+                    suffix: suffix.clone(),
+                    kind: LiteralKind::Integer,
+                })
+            },
+            lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Float { .. }} => {
+                Ok(Literal {
+                    value: raw.clone(),
+                    prefix: prefix.clone(),
+                    suffix: suffix.clone(),
+                    kind: LiteralKind::Float,
+                })
+            },
+            found => Err(ParserError::ExpectedLiteral { found: found.clone() }),
+        }
+    }
+
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        match lexer.next_token()? {
+            lexer::Token::StringChar { raw, prefix, suffix, quote: '"' } => {
+                Ok(Literal { value: raw, prefix, suffix, kind: LiteralKind::String })
+            },
+            lexer::Token::StringChar { raw, prefix, suffix, quote: '\'' } => {
+                Ok(Literal { value: raw, prefix, suffix, kind: LiteralKind::Char })
+            },
+            lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Integer } => {
+                Ok(Literal { value: raw, prefix, suffix, kind: LiteralKind::Integer })
+            },
+            lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Float { .. }} => {
+                Ok(Literal { value: raw, prefix, suffix, kind: LiteralKind::Float })
+            },
+            found => Err(ParserError::ExpectedLiteral { found }),
         }
     }
 }
