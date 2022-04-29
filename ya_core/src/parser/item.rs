@@ -27,13 +27,13 @@ impl Item {
 #[derive(Debug, PartialEq)]
 pub struct Func {
     pub proto: FuncProto,
-    pub body: Box<ExprBlock>,
+    pub body: Box<BlockExpr>,
 }
 
 impl Func {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         let decl = FuncProto::parse(lexer)?;
-        let body = ExprBlock::parse(lexer)?;
+        let body = BlockExpr::parse(lexer)?;
 
         Ok(Func { 
             proto: decl,

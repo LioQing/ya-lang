@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use thiserror::Error;
 
 #[cfg(test)]
@@ -65,7 +66,7 @@ pub struct Lexer<'a> {
     curr: std::iter::Peekable<std::str::Chars<'a>>,
     bracket_stack: Vec<char>,
 
-    peeked: Option<Result<Token, LexerError>>,
+    buf: VecDeque<Result<Token, LexerError>>,
 }
 
 impl<'a> Lexer<'a> {
@@ -81,7 +82,7 @@ impl<'a> Lexer<'a> {
             curr: src.chars().peekable(),
             bracket_stack: vec![],
 
-            peeked: None,
+            buf: VecDeque::new(),
         }
     }
 
@@ -90,39 +91,48 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn peek_token(&mut self) -> Result<&Token, LexerError> {
-        if self.peeked.is_none() {
-            self.ignore_whitespaces();
-            self.peeked = Some(self.to_token());
+        if self.buf.is_empty() {
+            let res = self.to_token();
+            self.buf.push_back(res);
         }
 
-        match self.peeked {
-            Some(ref peeked) => match peeked {
-                Ok(token) => Ok(&token),
-                Err(err) => Err(err.clone()),
-            },
-            None => unreachable!(),
+        match self.buf.front().unwrap() {
+            Ok(t) => Ok(t),
+            Err(e) => Err(e.clone()),
+        }
+    }
+
+    pub fn peek_nth_token(&mut self, n: usize) -> Result<&Token, LexerError> {
+        for _ in self.buf.len()..=n {
+            let res = self.to_token();
+            self.buf.push_back(res);
+        }
+
+        match self.buf.get(n).unwrap() {
+            Ok(t) => Ok(t),
+            Err(e) => Err(e.clone()),
         }
     }
 
     pub fn next_token(&mut self) -> Result<Token, LexerError> {
-        self.ignore_whitespaces();
-
-        if self.peeked.is_none() {
-            self.to_token()
+        if let Some(token) = self.buf.pop_front() {
+            token
         } else {
-            self.peeked.take().unwrap()
+            self.to_token()
         }
     }
 
     pub fn curr_bracket_depth(&self) -> usize {
-        if let Some(Ok(Token::Bracket { depth, kind: BracketKind::Open, .. })) = self.peeked {
-            depth
+        if let Some(Ok(Token::Bracket { depth, kind: BracketKind::Open, .. })) = self.buf.get(0) {
+            *depth
         } else {
             self.bracket_stack.len()
         }
     }
 
     fn to_token(&mut self) -> Result<Token, LexerError> {
+        self.ignore_whitespaces();
+
         let c = if let Some(c) = self.curr.next() {
             c
         } else {

@@ -1,5 +1,20 @@
 use super::*;
 
+macro_rules! allow_empty_bracket {
+    ($l:ident; $r:expr; $($b:expr),+) => {
+        if let Ok(_) = token::Bracket::peek_parse_close($l, &[$($b,)+]) {
+            return Ok($r);
+        }
+    };
+    ($l:ident; $r:expr; $($b:expr,)+) => {
+        if let Ok(_) = token::Bracket::peek_parse_close($l, &[$($b,)+]) {
+            return Ok($r);
+        }
+    };
+}
+
+pub(super) use allow_empty_bracket;
+
 #[derive(Debug, PartialEq)]
 pub struct Bracketed<T> {
     pub bracket: token::Bracket,
@@ -49,15 +64,53 @@ impl From<char> for Separator {
     }
 }
 
+pub enum SepRes<T> {
+    Cont(T),
+    Stop(T),
+}
+
+macro_rules! separated_helper {
+    ($l:ident; $r:expr; $(stop @ $t:pat)?) => {
+        let r = $r;
+        match $l.peek_token()? {
+            $($t => {
+                Ok(SepRes::Stop(r))
+            },)?
+            _ => {
+                Ok(SepRes::Cont(r))
+            },
+        }
+    };
+    ($l:ident; $r:expr; trailing @ $s:expr; $(stop @ $t:pat)?) => {
+        let r = $r;
+        match $l.peek_token()? {
+            lexer::Token::Separator { raw } if *raw == $s.into() => {
+                match $l.peek_nth_token(1)? {
+                    $($t => {
+                        $l.next_token().unwrap();
+                        Ok(SepRes::Stop(r))
+                    },)?
+                    _ => {
+                        Ok(SepRes::Cont(r))
+                    },
+                }
+            },
+            $($t => {
+                Ok(SepRes::Stop(r))
+            },)?
+            _ => {
+                Ok(SepRes::Cont(r))
+            },
+        }
+    };
+}
+
+pub(super) use separated_helper;
+
 #[derive(Debug, PartialEq)]
 pub struct Separated<T> {
     pub separator: Separator,
     pub content: Vec<T>,
-}
-
-pub enum SepRes<T> {
-    Cont(T),
-    Stop(T),
 }
 
 impl<T> Separated<T> {
@@ -121,26 +174,21 @@ impl FuncSign {
 
         // parameters
         let params = Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
-            if let Ok(_) = token::Bracket::peek_parse_close(lexer, &[token::Bracket::Round]) {
-                return Ok(Separated {
+            allow_empty_bracket! {
+                lexer;
+                Separated {
                     separator: Separator::Comma,
                     content: vec![],
-                });
-            }
+                };
+                token::Bracket::Round
+            };
 
             Separated::parse(lexer, Separator::Comma, |lexer| {
-                let param = Param::parse(lexer)?;
-
-                match lexer.peek_token() {
-                    Err(_) => {
-                        Err(ParserError::Lexer(lexer.next_token().err().unwrap()))
-                    },
-                    Ok(lexer::Token::Bracket { raw: ')', kind: lexer::BracketKind::Close, .. }) => {
-                        Ok(SepRes::Stop(param))
-                    },
-                    _ => {
-                        Ok(SepRes::Cont(param))
-                    },
+                separated_helper! {
+                    lexer;
+                    Param::parse(lexer)?;
+                    trailing @ Separator::Comma;
+                    stop @ lexer::Token::Bracket { raw: ')', kind: lexer::BracketKind::Close, .. }
                 }
             })
         })?.inner.content;

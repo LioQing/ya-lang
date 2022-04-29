@@ -8,56 +8,56 @@ pub enum ExprOrStmt {
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    /** primary expression: expression that can be directly parsed from tokens */
-    Prim(PrimExpr),
+    /** single token expression: directly parsed from 1 token */
+    SingleToken(SingleTokenExpr),
 
     /** block: `{ %[%stmt]* %expr? }` */
-    Block(ExprBlock),
+    Block(BlockExpr),
+
+    /** parenthesis: `(%expr)` */
+    Parens(ParensExpr),
+
+    /** function call: `%expr(%expr)` */
+    FuncCall(FuncCallExpr),
 }
 
 impl Expr {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
-        match lexer.peek_token() {
-            Ok(lexer::Token::Bracket { raw: '{', .. }) => {
-                Ok(Expr::Block(ExprBlock::parse(lexer)?))
-            },
-            Ok(token) if PrimExpr::is_prim_expr(token) => {
-                Ok(Expr::Prim(PrimExpr::parse(lexer)?))
+        // primary expression
+        let mut expr = match lexer.peek_token()? {
+            lexer::Token::Numeric { .. }
+            | lexer::Token::StringChar { .. }
+            | lexer::Token::Identifier { .. } => Ok(Expr::SingleToken(SingleTokenExpr::parse(lexer)?)),
+            lexer::Token::Bracket { raw: '{', .. } => Ok(Expr::Block(BlockExpr::parse(lexer)?)),
+            lexer::Token::Bracket { raw: '(', .. } => Ok(Expr::Parens(ParensExpr::parse(lexer)?)),
+            _ => Err(ParserError::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) }),
+        }?;
+
+        loop {
+            match lexer.peek_token()? {
+                lexer::Token::Bracket { raw: '(', .. } => {
+                    expr = Expr::FuncCall(FuncCallExpr::parse(lexer, expr)?);
+                },
+                _ => break Ok(expr),
             }
-            _ => {
-                Err(ParserError::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) })
-            },
         }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum PrimExpr {
+pub enum SingleTokenExpr {
     Literal(token::Literal),
     VarName(token::VarName),
 }
 
-impl PrimExpr {
-    pub fn is_prim_expr(token: &lexer::Token) -> bool {
-        match token {
-            lexer::Token::StringChar { .. } |
-            lexer::Token::Numeric { .. } | 
-            lexer::Token::Identifier { .. } => {
-                true
-            },
-            _ => {
-                false
-            },
-        }
-    }
-
+impl SingleTokenExpr {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         match lexer.peek_token()? {
             lexer::Token::StringChar { .. } | lexer::Token::Numeric { .. } => {
-                Ok(PrimExpr::Literal(token::Literal::parse(lexer)?))
+                Ok(SingleTokenExpr::Literal(token::Literal::parse(lexer)?))
             },
             lexer::Token::Identifier { .. } => {
-                Ok(PrimExpr::VarName(token::VarName::parse(lexer)?))
+                Ok(SingleTokenExpr::VarName(token::VarName::parse(lexer)?))
             },
             _ => {
                 Err(ParserError::ExpectedPrimExpr { found: format!("{:?}", lexer.next_token()?) })
@@ -67,12 +67,12 @@ impl PrimExpr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ExprBlock {
+pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
     pub expr: Option<Box<Expr>>,
 }
 
-impl ExprBlock {
+impl BlockExpr {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         let mut eos = {
             Bracketed::parse(lexer, &[token::Bracket::Curly], |lexer| {
@@ -87,9 +87,11 @@ impl ExprBlock {
                     let stmt = Stmt::parse_without_semicolon(lexer)?;
                     match (stmt, Stmt::is_end_of_statement(lexer)) {
                         (stmt, Ok(true)) => {
-                            let mut lexer_copy = lexer.clone();
-                            lexer_copy.skip(1);
-                            match token::Bracket::peek_parse_close(&mut lexer_copy, &[token::Bracket::Curly]) {
+                            match token::Bracket::peek_nth_parse_close(
+                                lexer,
+                                &[token::Bracket::Curly],
+                                1,
+                            ) {
                                 Ok(_) => {
                                     Stmt::consume_end_of_statement(lexer).unwrap();
                                     Ok(SepRes::Stop(ExprOrStmt::Stmt(stmt)))
@@ -139,9 +141,70 @@ impl ExprBlock {
             },
         };
 
-        Ok(ExprBlock {
+        Ok(BlockExpr {
             stmts,
             expr,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ParensExpr {
+    pub expr: Box<Expr>,
+}
+
+impl ParensExpr {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        Ok(ParensExpr {
+            expr: Box::new({
+                Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
+                    Expr::parse(lexer)
+                })
+            }?.inner),
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FuncCallExpr {
+    pub caller: Box<Expr>,
+    pub args: Vec<Expr>,
+}
+
+impl FuncCallExpr {
+    pub fn parse(lexer: &mut lexer::Lexer, caller: Expr) -> Result<Self, ParserError> {
+        let args = {
+            Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
+                allow_empty_bracket! {
+                    lexer;
+                    Separated {
+                        separator: Separator::Comma,
+                        content: vec![],
+                    };
+                    token::Bracket::Round
+                };
+
+                Separated::parse(lexer, Separator::Comma, |lexer| {
+                    let param = Expr::parse(lexer)?;
+                    
+                    match lexer.peek_token() {
+                        Err(_) => {
+                            Err(ParserError::Lexer(lexer.next_token().err().unwrap()))
+                        },
+                        Ok(lexer::Token::Bracket { raw: ')', kind: lexer::BracketKind::Close, .. }) => {
+                            Ok(SepRes::Stop(param))
+                        },
+                        _ => {
+                            Ok(SepRes::Cont(param))
+                        },
+                    }
+                })
+            })?.inner.content
+        };
+
+        Ok(FuncCallExpr {
+            caller: Box::new(caller),
+            args,
         })
     }
 }
