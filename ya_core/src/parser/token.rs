@@ -8,6 +8,13 @@ pub enum Keyword {
 }
 
 impl Keyword {
+    pub fn match_token(token: &lexer::Token, keywords: &[&str]) -> bool {
+        match token {
+            lexer::Token::Identifier { raw } => keywords.contains(&raw.as_str()),
+            _ => false,
+        }
+    }
+
     pub fn peek_parse(lexer: &mut lexer::Lexer, keywords: &[&str]) -> Result<Self, ParserError> {
         Keyword::parse_token(lexer.peek_token()?, keywords)
     }
@@ -43,6 +50,13 @@ pub struct FuncName {
 }
 
 impl FuncName {
+    pub fn match_token(token: &lexer::Token) -> bool {
+        match token {
+            lexer::Token::Identifier { .. } => true,
+            _ => false,
+        }
+    }
+
     pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         FuncName::parse_token(lexer.peek_token()?)
     }
@@ -72,6 +86,13 @@ pub struct VarName {
 }
 
 impl VarName {
+    pub fn match_token(token: &lexer::Token) -> bool {
+        match token {
+            lexer::Token::Identifier { .. } => true,
+            _ => false,
+        }
+    }
+
     pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         VarName::parse_token(lexer.peek_token()?)
     }
@@ -109,6 +130,13 @@ pub enum TypeName {
 }
 
 impl TypeName {
+    pub fn match_token(token: &lexer::Token) -> bool {
+        match token {
+            lexer::Token::Identifier { .. } => true,
+            _ => false,
+        }
+    }
+    
     pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         TypeName::parse_token(lexer.peek_token()?)
     }
@@ -150,6 +178,13 @@ pub struct Operator {
 }
 
 impl Operator {
+    pub fn match_token(token: &lexer::Token, ops: &[&str]) -> bool {
+        match token {
+            lexer::Token::Operator { raw } => ops.contains(&raw.as_str()),
+            _ => false,
+        }
+    }
+    
     pub fn peek_parse(lexer: &mut lexer::Lexer, ops: &[&str]) -> Result<Self, ParserError> {
         Operator::parse_token(lexer.peek_token()?, ops)
     }
@@ -158,7 +193,14 @@ impl Operator {
         Operator::parse_token(lexer.peek_nth_token(n)?, ops)
     }
 
-    pub fn parse(lexer: &mut lexer::Lexer, ops: &[&str]) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        match lexer.next_token()? {
+            lexer::Token::Operator { raw } => Ok(Operator { op: raw }),
+            found => return Err(ParserError::ExpectedOperator { expected: vec!["any".to_owned()], found }),
+        }
+    }
+
+    pub fn parse_with(lexer: &mut lexer::Lexer, ops: &[&str]) -> Result<Self, ParserError> {
         match lexer.next_token()? {
             lexer::Token::Operator { raw } if ops.contains(&raw.as_str()) => Ok(Operator { op: raw }),
             found => Err(ParserError::ExpectedOperator {
@@ -188,6 +230,13 @@ pub enum Bracket {
 }
 
 impl Bracket {
+    pub fn match_token(token: &lexer::Token, brackets: &[char]) -> bool {
+        match token {
+            lexer::Token::Bracket { raw, .. } => brackets.contains(raw),
+            _ => false,
+        }
+    }
+
     pub fn to_open_char(&self) -> char {
         match self {
             Bracket::Round => '(',
@@ -446,6 +495,40 @@ impl Bracket {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
+pub enum Separator {
+    Comma,
+    Semicolon,
+}
+
+impl Separator {
+    pub fn match_token(token: &lexer::Token, sep: Separator) -> bool {
+        match token {
+            lexer::Token::Separator { raw } => *raw == sep.into(),
+            _ => false,
+        }
+    }
+}
+
+impl Into<char> for Separator {
+    fn into(self) -> char {
+        match self {
+            Separator::Comma => ',',
+            Separator::Semicolon => ';',
+        }
+    }
+}
+
+impl From<char> for Separator {
+    fn from(c: char) -> Self {
+        match c {
+            ',' => Separator::Comma,
+            ';' => Separator::Semicolon,
+            _ => panic!("Separator::from: unexpected char: {}", c),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum LiteralKind {
     String,
     Char,
@@ -462,6 +545,13 @@ pub struct Literal {
 }
 
 impl Literal {
+    pub fn match_token(token: &lexer::Token) -> bool {
+        match token {
+            lexer::Token::StringChar { .. } | lexer::Token::Numeric { .. } => true,
+            _ => false,
+        }
+    }
+
     pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         Literal::parse_token(lexer.peek_token()?)
     }

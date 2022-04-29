@@ -6,13 +6,11 @@ use std::str::FromStr;
 mod tests;
 
 pub mod item;
-pub mod stmt;
 pub mod expr;
 pub mod construct;
 pub mod token;
 
 pub use expr::*;
-pub use stmt::*;
 pub use construct::*;
 pub use item::*;
 
