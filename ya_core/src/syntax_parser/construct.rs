@@ -2,13 +2,17 @@ use super::*;
 
 macro_rules! allow_empty_bracket {
     ($l:ident; $r:expr; $($b:expr),+) => {
-        if let Ok(_) = token::Bracket::peek_parse_close($l, &[$($b,)+]) {
-            return Ok($r);
+        if let Ok(lexer::Token::Bracket { raw, .. }) = $l.peek_token() {
+            if [$($b,)+].iter().any(|b| b.to_close_char() == *raw) {
+                return Ok($r);
+            }
         }
     };
     ($l:ident; $r:expr; $($b:expr,)+) => {
-        if let Ok(_) = token::Bracket::peek_parse_close($l, &[$($b,)+]) {
-            return Ok($r);
+        if let Ok(lexer::Token::Bracket { raw, .. }) = $l.peek_token() {
+            if [$($b,)+].iter().any(|b| b.to_close_char() == *raw) {
+                return Ok($r);
+            }
         }
     };
 }
@@ -150,9 +154,15 @@ macro_rules! separated_parse {
                 {
                     let r = $r;
                     
-                    if token::Separator::match_token($l.peek_token()?, $s) {
-                        while token::Separator::match_token($l.peek_nth_token(1)?, $s) {
-                            $l.next_token().unwrap();
+                    if let lexer::Token::Separator { raw } = $l.peek_token()? {
+                        if *raw == $s.into() {
+                            while let lexer::Token::Separator { raw } = $l.peek_nth_token(1)? {
+                                if *raw == $s.into() {
+                                    $l.next_token().unwrap();
+                                } else {
+                                    break;
+                                }
+                            }
                         }
                     }
 
@@ -199,7 +209,7 @@ impl<T> Separated<T> {
             }
 
             match lexer.next_token()? {
-                t if token::Separator::match_token(&t, sep) => {},
+                lexer::Token::Separator { raw } if raw == sep.into() => {},
                 found => return Err(Error::ExpectedSeparator { expected: sep.into(), found }),
             }
         };
@@ -213,79 +223,17 @@ impl<T> Separated<T> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Param {
+pub struct VarTypeDecl {
     pub name: token::VarName,
     pub ty: token::TypeName,
 }
 
-impl Param {
+impl VarTypeDecl {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         let name = token::VarName::parse(lexer)?;
         token::Operator::parse_with(lexer, &[":"])?;
         let ty = token::TypeName::parse(lexer)?;
 
         Ok(Self { name, ty })
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct FuncSign {
-    pub name: token::FuncName,
-    pub params: Vec<Param>,
-}
-
-impl FuncSign {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
-        // keyword `func`
-        token::Keyword::parse(lexer, &["func"])?;
-
-        // name
-        let name = token::FuncName::parse(lexer)?;
-
-        // parameters
-        let params = Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
-            allow_empty_bracket! {
-                lexer;
-                Separated {
-                    separator: token::Separator::Comma,
-                    items: vec![],
-                    is_trailing: false,
-                };
-                token::Bracket::Round
-            };
-
-            separated_parse! {
-                lexer;
-                Param::parse(lexer)?;
-                token::Separator::Comma;
-                allow_trailing;
-                lexer::Token::Bracket { raw: ')', .. }
-            }
-        })?.inner.items;
-
-        Ok(Self { name, params })
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct FuncProto {
-    pub sign: FuncSign,
-    pub ret_ty: token::TypeName,
-}
-
-impl FuncProto {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
-        // sign
-        let sign = FuncSign::parse(lexer)?;
-
-        // return type
-        let ret_ty = if token::Operator::peek_parse(lexer, &["->"]).is_ok() {
-            token::Operator::parse_with(lexer, &["->"]).unwrap();
-            token::TypeName::parse(lexer)?
-        } else {
-            token::TypeName::PrimType(token::PrimType::Unit)
-        };
-
-        Ok(Self { sign, ret_ty })
     }
 }

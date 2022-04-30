@@ -25,6 +25,9 @@ pub enum Expr {
 
     /** unary: `$op $expr` or `$expr $op` */
     Unary(UnaryExpr),
+
+    /** function: `($[$var_ty_decl,]* $[,]?) $[-> $ty]? $block_expr` */
+    Func(FuncExpr),
 }
 
 impl Expr {
@@ -45,7 +48,32 @@ impl Expr {
                 Ok(Self::Block(BlockExpr::parse(lexer)?))
             },
             Ok(lexer::Token::Bracket { raw: '(', .. }) => {
-                Ok(Self::Tuple(TupleExpr::parse(lexer)?))
+                match (lexer.peek_nth_token(1).map(|t| t.clone()), lexer.peek_nth_token(2)) {
+                    (
+                        Ok(lexer::Token::Bracket { raw: ')', .. }),
+                        Ok(lexer::Token::Bracket { raw: '{', .. })
+                    ) => {
+                        Ok(Self::Func(FuncExpr::parse(lexer)?))
+                    },
+                    (
+                        Ok(lexer::Token::Bracket { raw: ')', .. }),
+                        Ok(lexer::Token::Operator { raw, .. })
+                    ) if raw.as_str() == "->" => {
+                        Ok(Self::Func(FuncExpr::parse(lexer)?))
+                    },
+                    (Ok(lexer::Token::Bracket { raw: ')', .. }), _) => {
+                        Ok(Self::Tuple(TupleExpr::parse(lexer)?))
+                    },
+                    (
+                        Ok(lexer::Token::Identifier { .. }),
+                        Ok(lexer::Token::Operator { raw, .. })
+                    ) if raw.as_str() == ":" => {
+                        Ok(Self::Func(FuncExpr::parse(lexer)?))
+                    },
+                    _ => {
+                        Ok(Self::Tuple(TupleExpr::parse(lexer)?))
+                    },
+                }
             },
             Ok(lexer::Token::Operator { .. }) => {
                 Ok(Self::Unary(UnaryExpr::parse_pre(lexer)?))
@@ -171,18 +199,20 @@ impl LetExpr {
         token::Keyword::parse(lexer, &["let"])?;
         let var = token::VarName::parse(lexer)?;
 
-        let ty = if token::Operator::peek_parse(lexer, &[":"]).is_ok() {
-            token::Operator::parse_with(lexer, &[":"]).unwrap();
-            Some(token::TypeName::parse(lexer)?)
-        } else {
-            None
+        let ty = match lexer.peek_token() {
+            Ok(lexer::Token::Operator { raw }) if raw.as_str() == ":" => {
+                lexer.next_token()?;
+                Some(token::TypeName::parse(lexer)?)
+            },
+            _ => None,
         };
 
-        let expr = if token::Operator::peek_parse(lexer, &["="]).is_ok() {
-            token::Operator::parse_with(lexer, &["="]).unwrap();
-            Some(Box::new(Expr::parse(lexer)?))
-        } else {
-            None
+        let expr = match lexer.peek_token() {
+            Ok(lexer::Token::Operator { raw }) if raw.as_str() == "=" => {
+                lexer.next_token()?;
+                Some(Box::new(Expr::parse(lexer)?))
+            },
+            _ => None,
         };
 
         Ok(Self { var, ty, expr })
@@ -258,6 +288,56 @@ impl UnaryExpr {
             op,
             op_pos: UnaryOpPos::Post,
             expr: Box::new(expr),
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FuncExpr {
+    pub params: Vec<VarTypeDecl>,
+    pub ret_ty: token::TypeName,
+    pub body: Box<BlockExpr>,
+}
+
+impl FuncExpr {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+        // params
+        let params = Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
+            allow_empty_bracket! {
+                lexer;
+                Separated {
+                    separator: token::Separator::Comma,
+                    items: vec![],
+                    is_trailing: false,
+                };
+                token::Bracket::Round
+            };
+
+            separated_parse! {
+                lexer;
+                VarTypeDecl::parse(lexer)?;
+                token::Separator::Comma;
+                allow_trailing;
+                lexer::Token::Bracket { raw: ')', .. }
+            }
+        })?.inner.items;
+
+        // return type
+        let ret_ty = match lexer.peek_token() {
+            Ok(lexer::Token::Operator { raw }) if raw.as_str() == "->" => {
+                token::Operator::parse_with(lexer, &["->"]).unwrap();
+                token::TypeName::parse(lexer)?
+            },
+            _ => token::TypeName::PrimType(token::PrimType::Unit),
+        };
+
+        // body
+        let body = BlockExpr::parse(lexer)?;
+
+        Ok(Self { 
+            params,
+            ret_ty,
+            body: Box::new(body),
         })
     }
 }
