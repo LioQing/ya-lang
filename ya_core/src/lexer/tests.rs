@@ -48,7 +48,7 @@ fn separators() {
 fn missing_opening_bracket() {
     let mut lexer = Lexer::new("}");
 
-    assert_eq!(lexer.next_token(), Err(LexerError::NoOpeningBracket { close: '}' }));
+    assert_eq!(lexer.next_token(), Err(Error::NoOpeningBracket { close: '}' }));
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn imbalanced_brackets() {
     let mut lexer = Lexer::new("(}");
 
     assert_eq!(lexer.next_token(), Ok(Token::Bracket { raw: '(', depth: 0, kind: BracketKind::Open }));
-    assert_eq!(lexer.next_token(), Err(LexerError::MismatchedBrackets { expected: ')', found: '}' }));
+    assert_eq!(lexer.next_token(), Err(Error::MismatchedBrackets { expected: ')', found: '}' }));
 }
 
 #[test]
@@ -158,12 +158,12 @@ fn radices() {
 fn missing_valid_digits_after_numeric_prefix() {
     { // empty after prefix
         let mut lexer = Lexer::new("0x");
-        assert_eq!(lexer.next_token(), Err(LexerError::NoDigitsAfterNumericPrefix { prefix: "0x".to_owned() }));
+        assert_eq!(lexer.next_token(), Err(Error::NoDigitsAfterNumericPrefix { prefix: "0x".to_owned() }));
     }
 
     { // invalid digit after prefix
         let mut lexer = Lexer::new("0xzz");
-        assert_eq!(lexer.next_token(), Err(LexerError::NoDigitsAfterNumericPrefix { prefix: "0x".to_owned() }));
+        assert_eq!(lexer.next_token(), Err(Error::NoDigitsAfterNumericPrefix { prefix: "0x".to_owned() }));
         assert_eq!(lexer.next_token(), Ok(Token::Identifier { raw: "zz".to_owned() }));
     }
 }
@@ -251,7 +251,7 @@ fn char_with_prefix_suffix_escape_sequence() {
 fn string_with_unknown_escape_sequence() {
     let mut lexer = Lexer::new("abc\"def\\zghi\"jkl");
 
-    assert_eq!(lexer.next_token(), Err(LexerError::UnknownEscapeSequence {
+    assert_eq!(lexer.next_token(), Err(Error::UnknownEscapeSequence {
         raw: "abc\"def\\zghi\"jkl".to_owned(),
         sequence: "\\z".to_owned()
     }));
@@ -261,5 +261,5 @@ fn string_with_unknown_escape_sequence() {
 fn string_with_no_closing_quotation_mark() {
     let mut lexer = Lexer::new("abc\"def");
 
-    assert_eq!(lexer.next_token(), Err(LexerError::NoClosingQuote { raw: "abc\"def".to_owned() }));
+    assert_eq!(lexer.next_token(), Err(Error::NoClosingQuote { raw: "abc\"def".to_owned() }));
 }

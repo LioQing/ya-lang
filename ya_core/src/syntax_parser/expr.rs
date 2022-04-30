@@ -28,45 +28,45 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         // primary expression
         let mut expr = match lexer.peek_token() {
             Ok(lexer::Token::Identifier { raw }) if raw.as_str() == "let" => {
-                Ok(Expr::Let(LetExpr::parse(lexer)?))
+                Ok(Self::Let(LetExpr::parse(lexer)?))
             },
             Ok(lexer::Token::Numeric { .. }) |
             Ok(lexer::Token::StringChar { .. }) => {
-                Ok(Expr::Lit(token::Lit::parse(lexer)?))
+                Ok(Self::Lit(token::Lit::parse(lexer)?))
             },
             Ok(lexer::Token::Identifier { .. }) => {
-                Ok(Expr::VarName(token::VarName::parse(lexer)?))
+                Ok(Self::VarName(token::VarName::parse(lexer)?))
             },
             Ok(lexer::Token::Bracket { raw: '{', .. }) => {
-                Ok(Expr::Block(BlockExpr::parse(lexer)?))
+                Ok(Self::Block(BlockExpr::parse(lexer)?))
             },
             Ok(lexer::Token::Bracket { raw: '(', .. }) => {
-                Ok(Expr::Tuple(TupleExpr::parse(lexer)?))
+                Ok(Self::Tuple(TupleExpr::parse(lexer)?))
             },
             Ok(lexer::Token::Operator { .. }) => {
-                Ok(Expr::Unary(UnaryExpr::parse_pre(lexer)?))
+                Ok(Self::Unary(UnaryExpr::parse_pre(lexer)?))
             },
             _ => {
-                Err(ParserError::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) })
+                Err(Error::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) })
             },
         }?;
 
         loop {
             match lexer.peek_token() {
                 Ok(lexer::Token::Bracket { raw: '(', .. }) => {
-                    expr = Expr::Call(CallExpr::parse(lexer, expr)?);
+                    expr = Self::Call(CallExpr::parse(lexer, expr)?);
                 },
                 Ok(lexer::Token::Operator { .. }) => {
                     match lexer.peek_nth_token(1) {
-                        Ok(t) if Expr::is_expr(t) => {
-                            expr = Expr::Binary(BinaryExpr::parse(lexer, expr)?);
+                        Ok(t) if Self::is_expr(t) => {
+                            expr = Self::Binary(BinaryExpr::parse(lexer, expr)?);
                         },
                         _ => {
-                            expr = Expr::Unary(UnaryExpr::parse_post(lexer, expr)?);
+                            expr = Self::Unary(UnaryExpr::parse_post(lexer, expr)?);
                         },
                     }
                 },
@@ -97,16 +97,12 @@ pub struct BlockExpr {
 }
 
 impl BlockExpr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
-        let mut separated = {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+        let mut seps = {
             Bracketed::parse(lexer, &[token::Bracket::Curly], |lexer| {
                 allow_empty_bracket! {
                     lexer;
-                    Separated {
-                        separator: token::Separator::Semicolon,
-                        content: vec![],
-                        is_trailing: false,
-                    };
+                    Separated::new(token::Separator::Semicolon);
                     token::Bracket::Curly
                 }
 
@@ -121,16 +117,16 @@ impl BlockExpr {
             })
         }?.inner;
 
-        let expr = if separated.is_trailing {
+        let expr = if seps.is_trailing {
             None
-        } else if let Some(expr) = separated.content.pop() {
+        } else if let Some(expr) = seps.items.pop() {
             Some(Box::new(expr))
         } else {
             None
         };
 
-        Ok(BlockExpr {
-            stmts: separated.content,
+        Ok(Self {
+            stmts: seps.items,
             expr,
         })
     }
@@ -142,15 +138,11 @@ pub struct TupleExpr {
 }
 
 impl TupleExpr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         let items = Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
             allow_empty_bracket! {
                 lexer;
-                Separated {
-                    separator: token::Separator::Comma,
-                    content: vec![],
-                    is_trailing: false,
-                };
+                Separated::new(token::Separator::Comma);
                 token::Bracket::Round
             };
             
@@ -161,9 +153,9 @@ impl TupleExpr {
                 allow_trailing;
                 lexer::Token::Bracket { raw: ')', .. }
             }
-        })?.inner.content;
+        })?.inner.items;
 
-        Ok(TupleExpr { items })
+        Ok(Self { items })
     }
 }
 
@@ -175,7 +167,7 @@ pub struct LetExpr {
 }
 
 impl LetExpr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         token::Keyword::parse(lexer, &["let"])?;
         let var = token::VarName::parse(lexer)?;
 
@@ -193,7 +185,7 @@ impl LetExpr {
             None
         };
 
-        Ok(LetExpr { var, ty, expr })
+        Ok(Self { var, ty, expr })
     }
 }
 
@@ -204,10 +196,10 @@ pub struct CallExpr {
 }
 
 impl CallExpr {
-    pub fn parse(lexer: &mut lexer::Lexer, caller: Expr) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer, caller: Expr) -> Result<Self, Error> {
         let args = TupleExpr::parse(lexer)?.items;
 
-        Ok(CallExpr {
+        Ok(Self {
             caller: Box::new(caller),
             args,
         })
@@ -222,11 +214,11 @@ pub struct BinaryExpr {
 }
 
 impl BinaryExpr {
-    pub fn parse(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, Error> {
         let op = token::Operator::parse(lexer)?;
         let rhs = Expr::parse(lexer)?;
 
-        Ok(BinaryExpr {
+        Ok(Self {
             lhs: Box::new(expr),
             op,
             rhs: Box::new(rhs),
@@ -248,21 +240,21 @@ pub struct UnaryExpr {
 }
 
 impl UnaryExpr {
-    pub fn parse_pre(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse_pre(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         let op = token::Operator::parse(lexer)?;
         let expr = Expr::parse(lexer)?;
 
-        Ok(UnaryExpr {
+        Ok(Self {
             op,
             op_pos: UnaryOpPos::Pre,
             expr: Box::new(expr),
         })
     }
 
-    pub fn parse_post(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, ParserError> {
+    pub fn parse_post(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, Error> {
         let op = token::Operator::parse(lexer)?;
 
-        Ok(UnaryExpr {
+        Ok(Self {
             op,
             op_pos: UnaryOpPos::Post,
             expr: Box::new(expr),

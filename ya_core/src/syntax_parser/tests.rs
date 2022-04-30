@@ -2,9 +2,7 @@ use super::*;
 
 #[test]
 fn empty_func() {
-    let mut parser = Parser::new("func main() {}");
-
-    parser.parse_items();
+    let parser = Parser::parse("func main() {}");
 
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Func(Func {
@@ -21,13 +19,11 @@ fn empty_func() {
 
 #[test]
 fn hello_world_func() {
-    let mut parser = Parser::new(r#"
+    let parser = Parser::parse(r#"
     func hello_world() {
         println("Hello World!");
     }
     "#);
-
-    parser.parse_items();
 
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Func(Func {
@@ -56,14 +52,12 @@ fn hello_world_func() {
 
 #[test]
 fn add_i32_func() {
-    let mut parser = Parser::new(r#"
+    let parser = Parser::parse(r#"
     func add(a: i32, b: i32) -> i32 {
         println(f"Adding {} and {}", a, b);
         a + b
     }
     "#);
-
-    parser.parse_items();
 
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Func(Func {
@@ -101,14 +95,12 @@ fn add_i32_func() {
 
 #[test]
 fn extreme_empty_func() {
-    let mut parser = Parser::new(r#"
+    let parser = Parser::parse(r#"
     func main() -> () {
         ;;;;a;;;;
         b
     }
     "#);
-
-    parser.parse_items();
 
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Func(Func {
@@ -125,7 +117,7 @@ fn extreme_empty_func() {
 
 #[test]
 fn func_params_ret_and_let_expr() {
-    let mut parser = Parser::new(r#"
+    let parser = Parser::parse(r#"
     func main(argc: i32, argv: u8) -> bool {
         let a;
         let b: i32;
@@ -133,8 +125,6 @@ fn func_params_ret_and_let_expr() {
         let a: i32 = b;
     }
     "#);
-
-    parser.parse_items();
 
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Func(Func {
@@ -175,13 +165,11 @@ fn func_params_ret_and_let_expr() {
 
 #[test]
 fn tuple_and_unit() {
-    let mut parser = Parser::new(r#"
+    let parser = Parser::parse(r#"
     func main() -> (i32, ((), i64)) {
         (a + b, ((), 2i64))
     }
     "#);
-
-    parser.parse_items();
 
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Func(Func {

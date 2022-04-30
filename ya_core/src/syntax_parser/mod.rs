@@ -14,10 +14,10 @@ pub use expr::*;
 pub use construct::*;
 pub use item::*;
 
-#[derive(Error, Debug)]
-pub enum ParserError {
+#[derive(Error, Debug, PartialEq)]
+pub enum Error {
     #[error("{0}")]
-    Lexer(#[from] lexer::LexerError),
+    Lexer(#[from] lexer::Error),
 
     #[error("Enum parse error: {0}")]
     StrumEnumParse(#[from] strum::ParseError),
@@ -56,30 +56,29 @@ pub enum ParserError {
     UnknownTokenInGlobalScope { token: lexer::Token },
 }
 
-pub struct Parser<'a> {
+/// The syntax parser.
+/// 
+/// Performs syntactical analysis.
+/// Parse the tokens from lexer into a parse tree.
+pub struct Parser {
     pub items: Vec<Item>,
-    pub errs: Vec<ParserError>,
-    pub src: &'a str,
+    pub errs: Vec<Error>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(src: &'a str) -> Self {
-        Parser {
-            items: vec![],
-            errs: vec![],
-            src,
-        }
-    }
-
-    pub fn parse_items(&mut self) {
-        let mut lexer = lexer::Lexer::new(self.src);
+impl Parser {
+    pub fn parse(src: &str) -> Self {
+        let mut lexer = lexer::Lexer::new(src);
+        let mut items = vec![];
+        let mut errs = vec![];
 
         loop {
             match Item::parse(&mut lexer) {
                 Ok(Item::Eof) => break,
-                Err(e) => self.errs.push(e),
-                Ok(i) => self.items.push(i),
+                Err(e) => errs.push(e),
+                Ok(i) => items.push(i),
             }
         }
+
+        Self { items, errs }
     }
 }

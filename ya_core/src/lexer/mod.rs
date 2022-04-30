@@ -5,7 +5,7 @@ use thiserror::Error;
 mod tests;
 
 #[derive(Error, Debug, PartialEq, Clone)]
-pub enum LexerError {
+pub enum Error {
     #[error("No open bracket found for closing bracket `{close}`")]
     NoOpeningBracket { close: char },
 
@@ -61,12 +61,17 @@ pub enum NumericKind {
     Float { dot_pos: Option<usize>, exp_pos: Option<usize> },
 }
 
+/// The lexer.
+/// 
+/// Performs lexical analysis.
+/// Stores the source code.
+/// Provides methods to get and peek the next token.
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     curr: std::iter::Peekable<std::str::Chars<'a>>,
     bracket_stack: Vec<char>,
 
-    buf: VecDeque<Result<Token, LexerError>>,
+    buf: VecDeque<Result<Token, Error>>,
 }
 
 impl<'a> Lexer<'a> {
@@ -78,7 +83,7 @@ impl<'a> Lexer<'a> {
     const NUMERIC_RADIX_PREFIX: &'static [(&'static str, u32)] = &[("0x", 16), ("0o", 8), ("0b", 2)];
 
     pub fn new(src: &'a str) -> Self {
-        Lexer {
+        Self {
             curr: src.chars().peekable(),
             bracket_stack: vec![],
 
@@ -90,7 +95,7 @@ impl<'a> Lexer<'a> {
         (0..n).for_each(|_| { self.next_token().ok(); });
     }
 
-    pub fn peek_token(&mut self) -> Result<&Token, LexerError> {
+    pub fn peek_token(&mut self) -> Result<&Token, Error> {
         if self.buf.is_empty() {
             let res = self.to_token();
             self.buf.push_back(res);
@@ -102,7 +107,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn peek_nth_token(&mut self, n: usize) -> Result<&Token, LexerError> {
+    pub fn peek_nth_token(&mut self, n: usize) -> Result<&Token, Error> {
         for _ in self.buf.len()..=n {
             let res = self.to_token();
             self.buf.push_back(res);
@@ -114,7 +119,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn next_token(&mut self) -> Result<Token, LexerError> {
+    pub fn next_token(&mut self) -> Result<Token, Error> {
         if let Some(token) = self.buf.pop_front() {
             token
         } else {
@@ -130,7 +135,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn to_token(&mut self) -> Result<Token, LexerError> {
+    fn to_token(&mut self) -> Result<Token, Error> {
         self.ignore_whitespaces();
 
         let c = if let Some(c) = self.curr.next() {
@@ -140,18 +145,18 @@ impl<'a> Lexer<'a> {
         };
 
         match c {
-            c if Lexer::OPEN_BRACKETS.contains(&c) => Ok(self.tokenize_open_bracket(c)),
-            c if Lexer::CLOSE_BRACKETS.contains(&c) => self.tokenize_close_bracket(c),
-            c if Lexer::SEPARATORS.contains(&c) => Ok(Token::Separator { raw: c }),
+            c if Self::OPEN_BRACKETS.contains(&c) => Ok(self.tokenize_open_bracket(c)),
+            c if Self::CLOSE_BRACKETS.contains(&c) => self.tokenize_close_bracket(c),
+            c if Self::SEPARATORS.contains(&c) => Ok(Token::Separator { raw: c }),
             '0'..='9' => self.tokenize_numeric(c),
             '.' => match self.curr.peek() {
                 Some(&c) if c.is_digit(10) => self.tokenize_numeric('.'),
                 _ => Ok(self.tokenize_operator('.')),
             },
             c @ ('"' | '\'') => self.tokenize_string_char(c, "".to_owned()),
-            c if Lexer::is_operator_char(c) => Ok(self.tokenize_operator(c)),
-            c if Lexer::is_identifier_char(c) => self.tokenize_identifier(c),
-            c => Err(LexerError::UnknownSymbol { symbol: c.to_string() }),
+            c if Self::is_operator_char(c) => Ok(self.tokenize_operator(c)),
+            c if Self::is_identifier_char(c) => self.tokenize_identifier(c),
+            c => Err(Error::UnknownSymbol { symbol: c.to_string() }),
         }
     }
 
@@ -160,21 +165,21 @@ impl<'a> Lexer<'a> {
         Token::Bracket { raw: c, depth: self.bracket_stack.len() - 1, kind: BracketKind::Open }
     }
 
-    fn tokenize_close_bracket(&mut self, c: char) -> Result<Token, LexerError> {
+    fn tokenize_close_bracket(&mut self, c: char) -> Result<Token, Error> {
         match self.bracket_stack.last() {
-            Some(&last) if Lexer::match_close_bracket(c).unwrap() == last => {
+            Some(&last) if Self::match_close_bracket(c).unwrap() == last => {
                 self.bracket_stack.pop();
                 Ok(Token::Bracket { raw: c, depth: self.bracket_stack.len(), kind: BracketKind::Close })
             },
-            Some(&last) => Err(LexerError::MismatchedBrackets {
-                expected: Lexer::match_open_bracket(last).unwrap(),
+            Some(&last) => Err(Error::MismatchedBrackets {
+                expected: Self::match_open_bracket(last).unwrap(),
                 found: c,
             }),
-            None => Err(LexerError::NoOpeningBracket { close: c }),
+            None => Err(Error::NoOpeningBracket { close: c }),
         }
     }
 
-    fn tokenize_numeric(&mut self, first: char) ->Result<Token, LexerError> {
+    fn tokenize_numeric(&mut self, first: char) ->Result<Token, Error> {
         let mut raw = String::new();
         let mut prefix = String::new();
         let mut suffix = String::new();
@@ -183,7 +188,7 @@ impl<'a> Lexer<'a> {
         let mut radix = 10;
 
         // prefix
-        for (p, r) in Lexer::NUMERIC_RADIX_PREFIX {
+        for (p, r) in Self::NUMERIC_RADIX_PREFIX {
             if !p.starts_with(first) || p.len() - 1 > self.curr.clone().count() {
                 continue;
             }
@@ -209,7 +214,7 @@ impl<'a> Lexer<'a> {
                     raw.push(c);
                 },
                 Some(&c) if c.is_digit(radix) => raw.push(c),
-                _ => return Err(LexerError::NoDigitsAfterNumericPrefix { prefix }),
+                _ => return Err(Error::NoDigitsAfterNumericPrefix { prefix }),
             }
 
             self.curr.next();
@@ -257,7 +262,7 @@ impl<'a> Lexer<'a> {
 
         // suffix
         while let Some(&c) = self.curr.peek() {
-            if !Lexer::is_identifier_char(c) {
+            if !Self::is_identifier_char(c) {
                 break;
             }
 
@@ -268,7 +273,7 @@ impl<'a> Lexer<'a> {
         Ok(Token::Numeric { raw, prefix, suffix, kind })
     }
     
-    fn tokenize_string_char(&mut self, quote: char, prefix: String) -> Result<Token, LexerError> {
+    fn tokenize_string_char(&mut self, quote: char, prefix: String) -> Result<Token, Error> {
         let mut raw = String::new();
         let mut suffix = String::new();
 
@@ -305,7 +310,7 @@ impl<'a> Lexer<'a> {
                         },
                         None => {
                             self.curr.next();
-                            return Err(LexerError::NoClosingQuote { raw: prefix + &quote.to_string() + &raw + "\\" })
+                            return Err(Error::NoClosingQuote { raw: prefix + &quote.to_string() + &raw + "\\" })
                         },
                     }
                 },
@@ -315,13 +320,13 @@ impl<'a> Lexer<'a> {
             self.curr.next();
 
             if self.curr.peek().is_none() {
-                return Err(LexerError::NoClosingQuote { raw: prefix + &quote.to_string() + &raw })
+                return Err(Error::NoClosingQuote { raw: prefix + &quote.to_string() + &raw })
             }
         }
 
         // suffix
         while let Some(&c) = self.curr.peek() {
-            if !Lexer::is_identifier_char(c) {
+            if !Self::is_identifier_char(c) {
                 break;
             }
 
@@ -330,7 +335,7 @@ impl<'a> Lexer<'a> {
         }
 
         if let Some(sequence) = err {
-            Err(LexerError::UnknownEscapeSequence {
+            Err(Error::UnknownEscapeSequence {
                 raw: prefix + &quote.to_string() + &raw + &quote.to_string() + &suffix,
                 sequence
             })
@@ -343,7 +348,7 @@ impl<'a> Lexer<'a> {
         let mut raw = first.to_string();
 
         while let Some(&c) = self.curr.peek() {
-            if !Lexer::is_operator_char(c) {
+            if !Self::is_operator_char(c) {
                 break;
             }
 
@@ -354,14 +359,14 @@ impl<'a> Lexer<'a> {
         Token::Operator { raw }
     }
 
-    fn tokenize_identifier(&mut self, first: char) -> Result<Token, LexerError> {
+    fn tokenize_identifier(&mut self, first: char) -> Result<Token, Error> {
         let mut raw = first.to_string();
 
         while let Some(&c) = self.curr.peek() {
             if c == '"' || c == '\'' {
                 self.curr.next();
                 return self.tokenize_string_char(c, raw);
-            } else if !Lexer::is_identifier_char(c) {
+            } else if !Self::is_identifier_char(c) {
                 break;
             }
             
@@ -382,11 +387,11 @@ impl<'a> Lexer<'a> {
     }
 
     fn match_close_bracket(c: char) -> Option<char> {
-        Some(Lexer::OPEN_BRACKETS[Lexer::CLOSE_BRACKETS.iter().position(|&x| x == c)?])
+        Some(Self::OPEN_BRACKETS[Self::CLOSE_BRACKETS.iter().position(|&x| x == c)?])
     }
 
     fn match_open_bracket(c: char) -> Option<char> {
-        Some(Lexer::CLOSE_BRACKETS[Lexer::OPEN_BRACKETS.iter().position(|&x| x == c)?])
+        Some(Self::CLOSE_BRACKETS[Self::OPEN_BRACKETS.iter().position(|&x| x == c)?])
     }
 
     fn is_identifier_char(c: char) -> bool {
@@ -394,7 +399,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn is_operator_char(c: char) -> bool {
-        c != '_' && !Lexer::OPEN_BRACKETS.contains(&c) && !Lexer::CLOSE_BRACKETS.contains(&c) &&
-        !Lexer::SEPARATORS.contains(&c) && c.is_ascii_punctuation()
+        c != '_' && !Self::OPEN_BRACKETS.contains(&c) && !Self::CLOSE_BRACKETS.contains(&c) &&
+        !Self::SEPARATORS.contains(&c) && c.is_ascii_punctuation()
     }
 }

@@ -22,9 +22,9 @@ pub struct Bracketed<T> {
 }
 
 impl<T> Bracketed<T> {
-    pub fn parse<F>(lexer: &mut lexer::Lexer, brackets: &[token::Bracket], f: F) -> Result<Self, ParserError>
+    pub fn parse<F>(lexer: &mut lexer::Lexer, brackets: &[token::Bracket], f: F) -> Result<Self, Error>
     where
-        F: Fn(&mut lexer::Lexer) -> Result<T, ParserError>
+        F: Fn(&mut lexer::Lexer) -> Result<T, Error>
     {
         let bracket = token::Bracket::parse_open(lexer, brackets)?;
 
@@ -32,7 +32,7 @@ impl<T> Bracketed<T> {
 
         token::Bracket::parse_close(lexer, &[bracket])?;
 
-        Ok(Bracketed {
+        Ok(Self {
             bracket,
             inner,
         })
@@ -134,7 +134,7 @@ macro_rules! separated_parse {
                 $($t => {
                     return Ok(Separated {
                         separator: $s,
-                        content: vec![],
+                        items: vec![],
                         is_trailing: true,
                     })
                 },)?
@@ -170,34 +170,42 @@ pub(super) use separated_parse;
 #[derive(Debug, PartialEq)]
 pub struct Separated<T> {
     pub separator: token::Separator,
-    pub content: Vec<T>,
+    pub items: Vec<T>,
     pub is_trailing: bool,
 }
 
 impl<T> Separated<T> {
-    pub fn parse<F>(lexer: &mut lexer::Lexer, sep: token::Separator, parse: F) -> Result<Self, ParserError>
+    pub fn new(separator: token::Separator) -> Self {
+        Self {
+            separator,
+            items: vec![],
+            is_trailing: false,
+        }
+    }
+
+    pub fn parse<F>(lexer: &mut lexer::Lexer, sep: token::Separator, parse: F) -> Result<Self, Error>
     where
-        F: Fn(&mut lexer::Lexer) -> Result<SepRes<T>, ParserError>
+        F: Fn(&mut lexer::Lexer) -> Result<SepRes<T>, Error>
     {
-        let mut content = Vec::new();
+        let mut items = Vec::new();
 
         let is_trailing = loop {
             match parse(lexer)? {
-                SepRes::Cont { item } => content.push(item),
+                SepRes::Cont { item } => items.push(item),
                 SepRes::Stop { item, is_trailing } => {
-                    content.push(item);
+                    items.push(item);
                     break is_trailing;
                 }
             }
 
             match lexer.next_token()? {
                 t if token::Separator::match_token(&t, sep) => {},
-                found => return Err(ParserError::ExpectedSeparator { expected: sep.into(), found }),
+                found => return Err(Error::ExpectedSeparator { expected: sep.into(), found }),
             }
         };
 
-        Ok(Separated {
-            content,
+        Ok(Self {
+            items,
             separator: sep,
             is_trailing,
         })
@@ -211,12 +219,12 @@ pub struct Param {
 }
 
 impl Param {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         let name = token::VarName::parse(lexer)?;
         token::Operator::parse_with(lexer, &[":"])?;
         let ty = token::TypeName::parse(lexer)?;
 
-        Ok(Param { name, ty })
+        Ok(Self { name, ty })
     }
 }
 
@@ -227,7 +235,7 @@ pub struct FuncSign {
 }
 
 impl FuncSign {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         // keyword `func`
         token::Keyword::parse(lexer, &["func"])?;
 
@@ -240,7 +248,7 @@ impl FuncSign {
                 lexer;
                 Separated {
                     separator: token::Separator::Comma,
-                    content: vec![],
+                    items: vec![],
                     is_trailing: false,
                 };
                 token::Bracket::Round
@@ -253,9 +261,9 @@ impl FuncSign {
                 allow_trailing;
                 lexer::Token::Bracket { raw: ')', .. }
             }
-        })?.inner.content;
+        })?.inner.items;
 
-        Ok(FuncSign { name, params })
+        Ok(Self { name, params })
     }
 }
 
@@ -266,7 +274,7 @@ pub struct FuncProto {
 }
 
 impl FuncProto {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         // sign
         let sign = FuncSign::parse(lexer)?;
 
@@ -278,6 +286,6 @@ impl FuncProto {
             token::TypeName::PrimType(token::PrimType::Unit)
         };
 
-        Ok(FuncProto { sign, ret_ty })
+        Ok(Self { sign, ret_ty })
     }
 }

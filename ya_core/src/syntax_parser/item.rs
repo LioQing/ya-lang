@@ -7,7 +7,7 @@ pub enum Item {
 }
 
 impl Item {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         match lexer.peek_token() {
             Ok(t) if token::Keyword::match_token(t, &["func"]) => {
                 Ok(Item::Func(Func::parse(lexer)?))
@@ -16,7 +16,15 @@ impl Item {
                 lexer.next_token().unwrap();
                 Ok(Item::Eof)
             },
-            _ => Err(ParserError::UnknownTokenInGlobalScope { token: lexer.next_token()? }),
+            _ => Err(Error::UnknownTokenInGlobalScope { token: lexer.next_token()? }),
+        }
+    }
+
+    pub fn is_item(token: &lexer::Token) -> bool {
+        match token {
+            t if token::Keyword::match_token(t, &["func"]) => true,
+            lexer::Token::Eof => true,
+            _ => false,
         }
     }
 }
@@ -28,11 +36,11 @@ pub struct Func {
 }
 
 impl Func {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         let decl = FuncProto::parse(lexer)?;
         let body = BlockExpr::parse(lexer)?;
 
-        Ok(Func { 
+        Ok(Self { 
             proto: decl,
             body: Box::new(body),
         })
