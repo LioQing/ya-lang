@@ -6,7 +6,7 @@ pub enum Expr {
     Let(LetExpr),
 
     /** numeric or string or char literal */
-    Literal(token::Literal),
+    Lit(token::Lit),
 
     /** variable name */
     VarName(token::VarName),
@@ -14,14 +14,17 @@ pub enum Expr {
     /** block: `{ $[$expr$[;]+]* $[$expr]? }` */
     Block(BlockExpr),
 
-    /** parenthesis: `($expr)` */
-    Parens(ParensExpr),
+    /** tuple: `($[$expr,]* $[,]?)` */
+    Tuple(TupleExpr),
 
-    /** function call: `$expr($[$expr,]* $[,]?)` */
-    FuncCall(FuncCallExpr),
+    /** call: `$expr $tuple` */
+    Call(CallExpr),
 
-    /** binary expression: `$expr $op $expr` */
+    /** binary: `$expr $op $expr` */
     Binary(BinaryExpr),
+
+    /** unary: `$op $expr` or `$expr $op` */
+    Unary(UnaryExpr),
 }
 
 impl Expr {
@@ -33,7 +36,7 @@ impl Expr {
             },
             Ok(lexer::Token::Numeric { .. }) |
             Ok(lexer::Token::StringChar { .. }) => {
-                Ok(Expr::Literal(token::Literal::parse(lexer)?))
+                Ok(Expr::Lit(token::Lit::parse(lexer)?))
             },
             Ok(lexer::Token::Identifier { .. }) => {
                 Ok(Expr::VarName(token::VarName::parse(lexer)?))
@@ -42,7 +45,10 @@ impl Expr {
                 Ok(Expr::Block(BlockExpr::parse(lexer)?))
             },
             Ok(lexer::Token::Bracket { raw: '(', .. }) => {
-                Ok(Expr::Parens(ParensExpr::parse(lexer)?))
+                Ok(Expr::Tuple(TupleExpr::parse(lexer)?))
+            },
+            Ok(lexer::Token::Operator { .. }) => {
+                Ok(Expr::Unary(UnaryExpr::parse_pre(lexer)?))
             },
             _ => {
                 Err(ParserError::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) })
@@ -52,14 +58,34 @@ impl Expr {
         loop {
             match lexer.peek_token() {
                 Ok(lexer::Token::Bracket { raw: '(', .. }) => {
-                    expr = Expr::FuncCall(FuncCallExpr::parse(lexer, expr)?);
+                    expr = Expr::Call(CallExpr::parse(lexer, expr)?);
                 },
                 Ok(lexer::Token::Operator { .. }) => {
-                    expr = Expr::Binary(BinaryExpr::parse(lexer, expr)?);
+                    match lexer.peek_nth_token(1) {
+                        Ok(t) if Expr::is_expr(t) => {
+                            expr = Expr::Binary(BinaryExpr::parse(lexer, expr)?);
+                        },
+                        _ => {
+                            expr = Expr::Unary(UnaryExpr::parse_post(lexer, expr)?);
+                        },
+                    }
                 },
                 Err(_) => break Err(lexer.next_token().err().unwrap().into()),
                 _ => break Ok(expr),
             }
+        }
+    }
+
+    pub fn is_expr(token: &lexer::Token) -> bool {
+        match token {
+            &lexer::Token::Identifier { ref raw } if raw.as_str() == "let" => true,
+            &lexer::Token::Numeric { .. } |
+            &lexer::Token::StringChar { .. } => true,
+            &lexer::Token::Identifier { .. } => true,
+            &lexer::Token::Bracket { raw: '{', .. } => true,
+            &lexer::Token::Bracket { raw: '(', .. } => true,
+            &lexer::Token::Operator { .. } => true,
+            _ => false,
         }
     }
 }
@@ -111,19 +137,33 @@ impl BlockExpr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ParensExpr {
-    pub expr: Box<Expr>,
+pub struct TupleExpr {
+    pub items: Vec<Expr>,
 }
 
-impl ParensExpr {
+impl TupleExpr {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
-        Ok(ParensExpr {
-            expr: Box::new({
-                Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
-                    Expr::parse(lexer)
-                })
-            }?.inner),
-        })
+        let items = Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
+            allow_empty_bracket! {
+                lexer;
+                Separated {
+                    separator: token::Separator::Comma,
+                    content: vec![],
+                    is_trailing: false,
+                };
+                token::Bracket::Round
+            };
+            
+            separated_parse! {
+                lexer;
+                Expr::parse(lexer)?;
+                token::Separator::Comma;
+                allow_trailing;
+                lexer::Token::Bracket { raw: ')', .. }
+            }
+        })?.inner.content;
+
+        Ok(TupleExpr { items })
     }
 }
 
@@ -158,36 +198,16 @@ impl LetExpr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct FuncCallExpr {
+pub struct CallExpr {
     pub caller: Box<Expr>,
     pub args: Vec<Expr>,
 }
 
-impl FuncCallExpr {
+impl CallExpr {
     pub fn parse(lexer: &mut lexer::Lexer, caller: Expr) -> Result<Self, ParserError> {
-        let args = {
-            Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
-                allow_empty_bracket! {
-                    lexer;
-                    Separated {
-                        separator: token::Separator::Comma,
-                        content: vec![],
-                        is_trailing: false,
-                    };
-                    token::Bracket::Round
-                };
-                
-                separated_parse! {
-                    lexer;
-                    Expr::parse(lexer)?;
-                    token::Separator::Comma;
-                    allow_trailing;
-                    lexer::Token::Bracket { raw: ')', .. }
-                }
-            })?.inner.content
-        };
+        let args = TupleExpr::parse(lexer)?.items;
 
-        Ok(FuncCallExpr {
+        Ok(CallExpr {
             caller: Box::new(caller),
             args,
         })
@@ -196,8 +216,8 @@ impl FuncCallExpr {
 
 #[derive(Debug, PartialEq)]
 pub struct BinaryExpr {
-    pub lhs: Box<Expr>,
     pub op: token::Operator,
+    pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
 }
 
@@ -210,6 +230,42 @@ impl BinaryExpr {
             lhs: Box::new(expr),
             op,
             rhs: Box::new(rhs),
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum UnaryOpPos {
+    Pre,
+    Post,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct UnaryExpr {
+    pub op: token::Operator,
+    pub op_pos: UnaryOpPos,
+    pub expr: Box<Expr>,
+}
+
+impl UnaryExpr {
+    pub fn parse_pre(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
+        let op = token::Operator::parse(lexer)?;
+        let expr = Expr::parse(lexer)?;
+
+        Ok(UnaryExpr {
+            op,
+            op_pos: UnaryOpPos::Pre,
+            expr: Box::new(expr),
+        })
+    }
+
+    pub fn parse_post(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, ParserError> {
+        let op = token::Operator::parse(lexer)?;
+
+        Ok(UnaryExpr {
+            op,
+            op_pos: UnaryOpPos::Post,
+            expr: Box::new(expr),
         })
     }
 }

@@ -119,43 +119,66 @@ impl VarName {
 #[derive(strum::EnumString, strum::AsRefStr, Debug, PartialEq, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub enum PrimType {
-    Unit, I8, I16, I32, I64,
-    U8, U16, U32, U64, F32, F64, Bool,
+    #[strum(disabled)]
+    Unit,
+    I8, I16, I32, I64,
+    U8, U16, U32, U64,
+    F32, F64,
+    Bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TypeName {
     PrimType(PrimType),
     Struct(String),
+    Tuple(Vec<TypeName>),
 }
 
 impl TypeName {
     pub fn match_token(token: &lexer::Token) -> bool {
         match token {
+            lexer::Token::Bracket { raw: '(', .. } => true,
             lexer::Token::Identifier { .. } => true,
             _ => false,
         }
     }
-    
-    pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
-        TypeName::parse_token(lexer.peek_token()?)
-    }
-
-    pub fn peek_nth_parse(lexer: &mut lexer::Lexer, n: usize) -> Result<Self, ParserError> {
-        TypeName::parse_token(lexer.peek_nth_token(n)?)
-    }
 
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
-        match lexer.next_token()? {
-            lexer::Token::Identifier { raw } => Ok(TypeName::from_str(&raw).unwrap()),
-            found => return Err(ParserError::ExpectedIdentifier { found }),
-        }
-    }
+        match lexer.peek_token()? {
+            lexer::Token::Bracket { raw: '(', .. } => {
+                let tys = Bracketed::parse(lexer, &[Bracket::Round], |lexer| {
+                    allow_empty_bracket! {
+                        lexer;
+                        Separated {
+                            separator: token::Separator::Comma,
+                            content: vec![],
+                            is_trailing: false,
+                        };
+                        token::Bracket::Round
+                    };
+        
+                    separated_parse! {
+                        lexer;
+                        TypeName::parse(lexer)?;
+                        token::Separator::Comma;
+                        allow_trailing;
+                        lexer::Token::Bracket { raw: ')', .. }
+                    }
+                })?.inner.content;
 
-    pub fn parse_token(token: &lexer::Token) -> Result<Self, ParserError> {
-        match token {
-            lexer::Token::Identifier { raw } => Ok(TypeName::from_str(&raw).unwrap()),
-            found => return Err(ParserError::ExpectedIdentifier { found: found.clone() }),
+                match tys.as_slice() {
+                    [] => Ok(TypeName::PrimType(PrimType::Unit)),
+                    [..] => Ok(TypeName::Tuple(tys)),
+                }
+            }
+            lexer::Token::Identifier { .. } => {
+                if let lexer::Token::Identifier { raw } = lexer.next_token().unwrap() {
+                    Ok(TypeName::from_str(raw.as_str()).unwrap())
+                } else {
+                    unreachable!()
+                }
+            },
+            _ => return Err(ParserError::ExpectedIdentifier { found: lexer.next_token().unwrap() }),
         }
     }
 }
@@ -529,7 +552,7 @@ impl From<char> for Separator {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum LiteralKind {
+pub enum LitKind {
     String,
     Char,
     Integer,
@@ -537,14 +560,14 @@ pub enum LiteralKind {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Literal {
+pub struct Lit {
     pub value: String,
     pub prefix: String,
     pub suffix: String,
-    pub kind: LiteralKind,
+    pub kind: LitKind,
 }
 
-impl Literal {
+impl Lit {
     pub fn match_token(token: &lexer::Token) -> bool {
         match token {
             lexer::Token::StringChar { .. } | lexer::Token::Numeric { .. } => true,
@@ -553,26 +576,26 @@ impl Literal {
     }
 
     pub fn peek_parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
-        Literal::parse_token(lexer.peek_token()?)
+        Lit::parse_token(lexer.peek_token()?)
     }
 
     pub fn peek_nth_parse(lexer: &mut lexer::Lexer, n: usize) -> Result<Self, ParserError> {
-        Literal::parse_token(lexer.peek_nth_token(n)?)
+        Lit::parse_token(lexer.peek_nth_token(n)?)
     }
 
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, ParserError> {
         match lexer.next_token()? {
             lexer::Token::StringChar { raw, prefix, suffix, quote: '"' } => {
-                Ok(Literal { value: raw, prefix, suffix, kind: LiteralKind::String })
+                Ok(Lit { value: raw, prefix, suffix, kind: LitKind::String })
             },
             lexer::Token::StringChar { raw, prefix, suffix, quote: '\'' } => {
-                Ok(Literal { value: raw, prefix, suffix, kind: LiteralKind::Char })
+                Ok(Lit { value: raw, prefix, suffix, kind: LitKind::Char })
             },
             lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Integer } => {
-                Ok(Literal { value: raw, prefix, suffix, kind: LiteralKind::Integer })
+                Ok(Lit { value: raw, prefix, suffix, kind: LitKind::Integer })
             },
             lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Float { .. }} => {
-                Ok(Literal { value: raw, prefix, suffix, kind: LiteralKind::Float })
+                Ok(Lit { value: raw, prefix, suffix, kind: LitKind::Float })
             },
             found => Err(ParserError::ExpectedLiteral { found }),
         }
@@ -581,35 +604,35 @@ impl Literal {
     pub fn parse_token(token: &lexer::Token) -> Result<Self, ParserError> {
         match token {
             lexer::Token::StringChar { raw, prefix, suffix, quote: '"' } => {
-                Ok(Literal {
+                Ok(Lit {
                     value: raw.clone(),
                     prefix: prefix.clone(),
                     suffix: suffix.clone(),
-                    kind: LiteralKind::String,
+                    kind: LitKind::String,
                 })
             },
             lexer::Token::StringChar { raw, prefix, suffix, quote: '\'' } => {
-                Ok(Literal {
+                Ok(Lit {
                     value: raw.clone(),
                     prefix: prefix.clone(),
                     suffix: suffix.clone(),
-                    kind: LiteralKind::Char,
+                    kind: LitKind::Char,
                 })
             },
             lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Integer } => {
-                Ok(Literal {
+                Ok(Lit {
                     value: raw.clone(),
                     prefix: prefix.clone(),
                     suffix: suffix.clone(),
-                    kind: LiteralKind::Integer,
+                    kind: LitKind::Integer,
                 })
             },
             lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Float { .. }} => {
-                Ok(Literal {
+                Ok(Lit {
                     value: raw.clone(),
                     prefix: prefix.clone(),
                     suffix: suffix.clone(),
-                    kind: LiteralKind::Float,
+                    kind: LitKind::Float,
                 })
             },
             found => Err(ParserError::ExpectedLiteral { found: found.clone() }),

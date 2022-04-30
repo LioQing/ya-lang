@@ -126,8 +126,22 @@ macro_rules! separated_parse {
         })
     };
     ($l:ident; $r:expr; $s:expr; allow_empty; allow_trailing; $($t:pat)?) => {
-        while token::Separator::match_token($l.peek_token()?, $s) {
-            $l.next_token().unwrap();
+        loop {
+            match $l.peek_token()? {
+                lexer::Token::Separator { raw } if *raw == $s.into() => {
+                    $l.next_token().unwrap();
+                },
+                $($t => {
+                    return Ok(Separated {
+                        separator: $s,
+                        content: vec![],
+                        is_trailing: true,
+                    })
+                },)?
+                _ => {
+                    break;
+                },
+            }
         }
 
         Separated::parse($l, $s, |$l| {
