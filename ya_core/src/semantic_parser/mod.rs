@@ -1,10 +1,12 @@
-use crate::syntax_parser as synt;
+use crate::syntax_parser as syn;
 use crate::prim_type::PrimType;
 use thiserror::Error;
 
-pub mod item;
+pub mod expr;
+pub mod env;
 
-pub use item::*;
+pub use expr::*;
+pub use env::*;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum Error {
@@ -13,6 +15,9 @@ pub enum Error {
 
     #[error("Invalid literal suffix {suffix}")]
     InvalidLiteralSuffix { suffix: String },
+
+    #[error("Conflicting types {type1:?} and {type2:?}")]
+    ConflictingTypes { type1: Type, type2: Type },
 }
 
 /// The semantic parser.
@@ -20,56 +25,77 @@ pub enum Error {
 /// Performs semantic analysis.
 /// Parse the parse tree into an AST.
 pub struct Parser {
-    pub global: Env,
+    pub global_env: Env,
+    pub funcs: Vec<FuncExpr>,
     pub errs: Vec<Error>,
 }
 
 impl Parser {
-    pub fn parse(syntax_items: &Vec<synt::Item>) -> Self {
+    pub fn parse(syn_items: &Vec<syn::Item>) -> Self {
         let mut global = Env {
             ty: vec![],
             vars: vec![],
         };
         let mut errs = vec![];
 
-        for item in syntax_items {
+        // first scan: global items
+        let mut funcs = vec![];
+        for item in syn_items {
             match item {
-                synt::Item::Let(expr) => {
+                syn::Item::Let(expr) => {
                     let name = expr.var.name.clone();
-
-                    let ty = expr.ty
-                        .as_ref()
-                        .map(|ty| ty.into());
                     
                     let deduced_ty = match expr.expr
                         .as_ref()
-                        .map_or(Ok(Type::PrimType(PrimType::Unit)), |expr| {
-                            Expr::get_ty_from_syntax(expr.as_ref())
+                        .map(|expr| {
+                            Expr::get_ty_from_syn(expr.as_ref())
                         })
                     {
-                        Ok(ty) => ty,
-                        Err(err) => {
+                        Some(Err(err)) => {
                             errs.push(err);
                             continue;
-                        }
+                        },
+                        ty => ty.map(|r| r.unwrap()),
                     };
                     
-                    if matches!(&ty, Some(ty) if *ty != deduced_ty) {
-                        errs.push(Error::GlobalVarNotDefined { var: name });
-                        continue;
+                    let ty = expr.ty
+                        .as_ref()
+                        .map(|ty| ty.into());
+
+                    let ty = match (ty, deduced_ty) {
+                        (Some(ty1), Some(ty2)) if ty1 != ty2 => {
+                            errs.push(Error::ConflictingTypes { type1: ty1, type2: ty2 });
+                            continue;
+                        },
+                        (_, Some(ty)) | (Some(ty), _) =>  Some(ty),
+                        (None, None) => {
+                            errs.push(Error::GlobalVarNotDefined { var: name });
+                            continue;
+                        },
+                    };
+
+                    // add function to be parsed later
+                    if matches!((&ty, &expr.expr), (Some(Type::Func(_)), Some(_))) {
+                        funcs.push(expr.expr.as_ref().unwrap());
                     }
 
                     global.vars.push(Var {
-                        ty: ty.map_or(Some(deduced_ty), |ty| Some(ty)),
-                        name
+                        ty,
+                        name,
                     })
                 }
-                synt::Item::Eof => {},
+                syn::Item::Eof => {},
             }
         }
 
+        // // second scan: function codes
+        // let funcs = for expr in funcs {
+
+        // };
+
         Self {
-            global,
+            global_env: global,
+            funcs: vec![], // TODO: implement function body parsing
             errs,
         }
     }

@@ -1,5 +1,3 @@
 let main = () -> i32 {
-    let a = (b: i32) { println(b); };
+    let a = 123;
 }
-
-let a = 32.2i32;

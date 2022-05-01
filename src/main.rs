@@ -12,6 +12,7 @@ fn main() {
 
     let sem_parser = semantic_parser::Parser::parse(&synt_parser.items);
 
-    println!("{:#?}", sem_parser.global);
+    println!("{:#?}", sem_parser.global_env);
+    println!("{:#?}", sem_parser.funcs);
     println!("{:#?}", sem_parser.errs);
 }
