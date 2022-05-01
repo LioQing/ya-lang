@@ -5,8 +5,13 @@ use ya_core::*;
 fn main() {
     let src = std::fs::read_to_string("ya_core/examples/hello_world.ya").unwrap();
 
-    let parser = syntax_parser::Parser::parse(&src);
+    let synt_parser = syntax_parser::Parser::parse(&src);
 
-    println!("{:#?}", parser.items);
-    println!("{:#?}", parser.errs);
+    println!("{:#?}", synt_parser.items);
+    println!("{:#?}", synt_parser.errs);
+
+    let sem_parser = semantic_parser::Parser::parse(&synt_parser.items);
+
+    println!("{:#?}", sem_parser.global);
+    println!("{:#?}", sem_parser.errs);
 }

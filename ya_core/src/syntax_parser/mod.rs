@@ -1,4 +1,5 @@
 use crate::lexer;
+use crate::prim_type::PrimType;
 use thiserror::Error;
 use std::str::FromStr;
 

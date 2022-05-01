@@ -328,7 +328,7 @@ impl FuncExpr {
                 token::Operator::parse_with(lexer, &["->"]).unwrap();
                 token::TypeName::parse(lexer)?
             },
-            _ => token::TypeName::PrimType(token::PrimType::Unit),
+            _ => token::TypeName::PrimType(PrimType::Unit),
         };
 
         // body

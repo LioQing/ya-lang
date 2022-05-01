@@ -10,7 +10,7 @@ fn empty_func() {
         ty: None,
         expr: Some(Box::new(Expr::Func(FuncExpr {
             params: vec![],
-            ret_ty: token::TypeName::PrimType(token::PrimType::Unit),
+            ret_ty: token::TypeName::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
                 stmts: vec![],
                 expr: None,
@@ -33,7 +33,7 @@ fn hello_world_func() {
         ty: None,
         expr: Some(Box::new(Expr::Func(FuncExpr {
             params: vec![],
-            ret_ty: token::TypeName::PrimType(token::PrimType::Unit),
+            ret_ty: token::TypeName::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
                 stmts: vec![
                     Expr::Call(CallExpr {
@@ -71,14 +71,14 @@ fn add_i32_func() {
             params: vec![
                 VarTypeDecl {
                     name: token::VarName { name: "a".to_owned() },
-                    ty: token::TypeName::PrimType(token::PrimType::I32),
+                    ty: token::TypeName::PrimType(PrimType::I32),
                 },
                 VarTypeDecl {
                     name: token::VarName { name: "b".to_owned() },
-                    ty: token::TypeName::PrimType(token::PrimType::I32),
+                    ty: token::TypeName::PrimType(PrimType::I32),
                 },
             ],
-            ret_ty: token::TypeName::PrimType(token::PrimType::I32),
+            ret_ty: token::TypeName::PrimType(PrimType::I32),
             body: Box::new(BlockExpr {
                 stmts: vec![
                     Expr::Call(CallExpr {
@@ -120,7 +120,7 @@ fn extreme_empty_func() {
         ty: None,
         expr: Some(Box::new(Expr::Func(FuncExpr {
             params: vec![],
-            ret_ty: token::TypeName::PrimType(token::PrimType::Unit),
+            ret_ty: token::TypeName::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
                 stmts: vec![Expr::VarName(token::VarName { name: "a".to_owned() })],
                 expr: Some(Box::new(Expr::VarName(token::VarName { name: "b".to_owned() }))),
@@ -148,14 +148,14 @@ fn func_params_ret_and_let_expr() {
             params: vec![
                 VarTypeDecl {
                     name: token::VarName { name: "argc".to_owned() },
-                    ty: token::TypeName::PrimType(token::PrimType::I32),
+                    ty: token::TypeName::PrimType(PrimType::I32),
                 },
                 VarTypeDecl {
                     name: token::VarName { name: "argv".to_owned() },
-                    ty: token::TypeName::PrimType(token::PrimType::U8),
+                    ty: token::TypeName::PrimType(PrimType::U8),
                 },
             ],
-            ret_ty: token::TypeName::PrimType(token::PrimType::Bool),
+            ret_ty: token::TypeName::PrimType(PrimType::Bool),
             body: Box::new(BlockExpr {
                 stmts: vec![
                     Expr::Let(LetExpr {
@@ -165,7 +165,7 @@ fn func_params_ret_and_let_expr() {
                     }),
                     Expr::Let(LetExpr {
                         var: token::VarName { name: "b".to_owned() },
-                        ty: Some(token::TypeName::PrimType(token::PrimType::I32)),
+                        ty: Some(token::TypeName::PrimType(PrimType::I32)),
                         expr: None,
                     }),
                     Expr::Let(LetExpr {
@@ -175,7 +175,7 @@ fn func_params_ret_and_let_expr() {
                     }),
                     Expr::Let(LetExpr {
                         var: token::VarName { name: "a".to_owned() },
-                        ty: Some(token::TypeName::PrimType(token::PrimType::I32)),
+                        ty: Some(token::TypeName::PrimType(PrimType::I32)),
                         expr: Some(Box::new(Expr::VarName(token::VarName { name: "b".to_owned() }))),
                     }),
                 ],
@@ -200,10 +200,10 @@ fn tuple_and_unit() {
         expr: Some(Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::TypeName::Tuple(vec![
-                token::TypeName::PrimType(token::PrimType::I32),
+                token::TypeName::PrimType(PrimType::I32),
                 token::TypeName::Tuple(vec![
-                    token::TypeName::PrimType(token::PrimType::Unit),
-                    token::TypeName::PrimType(token::PrimType::I64),
+                    token::TypeName::PrimType(PrimType::Unit),
+                    token::TypeName::PrimType(PrimType::I64),
                 ]),
             ]),
             body: Box::new(BlockExpr {
