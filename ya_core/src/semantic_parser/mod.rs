@@ -1,5 +1,6 @@
 use crate::syntax_parser as syn;
 use crate::prim_type::PrimType;
+use std::collections::HashMap;
 use thiserror::Error;
 
 pub mod expr;
@@ -33,8 +34,8 @@ pub struct Parser {
 impl Parser {
     pub fn parse(syn_items: &Vec<syn::Item>) -> Self {
         let mut global = Env {
-            ty: vec![],
-            vars: vec![],
+            tys: HashMap::new(),
+            vars: HashMap::new(),
         };
         let mut errs = vec![];
 
@@ -75,14 +76,13 @@ impl Parser {
                     };
 
                     // add function to be parsed later
-                    if matches!((&ty, &expr.expr), (Some(Type::Func(_)), Some(_))) {
-                        funcs.push(expr.expr.as_ref().unwrap());
+                    if let (Some(Type::Func(_)), Some(expr)) = (&ty, &expr.expr) {
+                        if let syn::Expr::Block(block) = expr.as_ref() {
+                            funcs.push(block);
+                        }
                     }
 
-                    global.vars.push(Var {
-                        ty,
-                        name,
-                    })
+                    global.vars.insert(name, ty);
                 }
                 syn::Item::Eof => {},
             }

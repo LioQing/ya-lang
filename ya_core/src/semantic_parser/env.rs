@@ -2,20 +2,14 @@ use super::*;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Env {
-    pub ty: Vec<Type>,
-    pub vars: Vec<Var>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Var {
-    pub ty: Option<Type>,
-    pub name: String,
+    pub tys: HashMap<String, Type>,
+    pub vars: HashMap<String, Option<Type>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     PrimType(PrimType),
-    Struct(String),
+    Struct(HashMap<String, Type>),
     Tuple(Vec<Type>),
     Func(FuncType),
 }
@@ -24,7 +18,7 @@ impl From<&syn::token::TypeName> for Type {
     fn from(ty: &syn::token::TypeName) -> Self {
         match ty {
             syn::token::TypeName::PrimType(prim_type) => Type::PrimType(*prim_type),
-            syn::token::TypeName::Struct(name) => Type::Struct(name.clone()),
+            syn::token::TypeName::Struct(_) => Type::Struct(HashMap::new()),
             syn::token::TypeName::Tuple(tys) => Type::Tuple(tys.iter().map(|ty| ty.into()).collect()),
         }
     }

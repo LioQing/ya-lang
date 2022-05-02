@@ -32,43 +32,61 @@ pub enum ExprKind {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LetExpr {
-    pub var: Var,
+    pub var: String,
     pub expr: Box<Expr>,
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum LitKind {
+    String,
+    Char,
+    Integer,
+    Float,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LitExpr {
-    
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum LitKind {
-    
+    pub value: String,
+    pub prefix: String,
+    pub suffix: String,
+    pub kind: LitKind,
+    pub ty: Type,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct VarExpr {
-    
+    pub name: String,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TupleExpr {
-    
+    pub vars: Vec<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CallExpr {
-    
+    pub caller: Box<Expr>,
+    pub args: Vec<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BinaryExpr {
-    
+    pub op: String,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum UnaryOpPos {
+    Pre,
+    Post,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct UnaryExpr {
-    
+    pub op: String,
+    pub op_pos: UnaryOpPos,
+    pub expr: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
