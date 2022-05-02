@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    /** let: let $var_name $[: $type_name]? $[= $expr]; */
+    /** let: let $var_name $[: $type_name]? */
     Let(LetExpr),
 
     /** numeric or string or char literal */
@@ -191,7 +191,6 @@ impl TupleExpr {
 pub struct LetExpr {
     pub var: token::VarName,
     pub ty: Option<token::TypeName>,
-    pub expr: Option<Box<Expr>>,
 }
 
 impl LetExpr {
@@ -207,21 +206,13 @@ impl LetExpr {
             _ => None,
         };
 
-        let expr = match lexer.peek_token() {
-            Ok(lexer::Token::Operator { raw }) if raw.as_str() == "=" => {
-                lexer.next_token()?;
-                Some(Box::new(Expr::parse(lexer)?))
-            },
-            _ => None,
-        };
-
-        Ok(Self { var, ty, expr })
+        Ok(Self { var, ty })
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct CallExpr {
-    pub caller: Box<Expr>,
+    pub callee: Box<Expr>,
     pub args: Vec<Expr>,
 }
 
@@ -230,7 +221,7 @@ impl CallExpr {
         let args = TupleExpr::parse(lexer)?.items;
 
         Ok(Self {
-            caller: Box::new(caller),
+            callee: Box::new(caller),
             args,
         })
     }

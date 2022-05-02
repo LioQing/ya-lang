@@ -3,14 +3,15 @@ use super::*;
 #[derive(Debug, PartialEq)]
 pub enum Item {
     Eof,
-    Let(LetExpr),
+    Def(BinaryExpr),
 }
 
 impl Item {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         match lexer.peek_token() {
             Ok(lexer::Token::Identifier { raw }) if raw.as_str() == "let" => {
-                Ok(Item::Let(LetExpr::parse(lexer)?))
+                let expr = Expr::Let(LetExpr::parse(lexer)?);
+                Ok(Item::Def(BinaryExpr::parse(lexer, expr)?))
             },
             Ok(lexer::Token::Eof) => {
                 lexer.next_token().unwrap();

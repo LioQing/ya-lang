@@ -6,6 +6,65 @@ pub struct Env {
     pub vars: HashMap<String, Option<Type>>,
 }
 
+impl Env {
+    pub fn get_ty(&self, ty: &str) -> Result<&Type, Error> {
+        self.tys
+            .get(ty)
+            .ok_or(Error::TypeNotFound { ty: ty.to_owned() })
+    }
+
+    pub fn get_var(&self, var: &str) -> Result<&Option<Type>, Error> {
+        self.vars
+            .get(var)
+            .ok_or(Error::VarNotFound { var: var.to_owned() })
+    }
+
+    pub fn get_decl_var(&self, var: &str) -> Result<&Type, Error> {
+        match self.get_var(var) {
+            Ok(Some(ty)) => Ok(ty),
+            Ok(None) => Err(Error::UndefVar { var: var.to_owned() }),
+            Err(err) => Err(err),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct EnvStack {
+    pub envs: Vec<Env>,
+}
+
+impl EnvStack {
+    pub fn get_ty(&self, ty: &str) -> Result<&Type, Error> {
+        self.envs
+            .iter()
+            .rev()
+            .find_map(|env| match env.get_ty(ty) {
+                Ok(ty) => Some(ty),
+                Err(_) => None,
+            })
+            .ok_or(Error::TypeNotFound { ty: ty.to_owned() })
+    }
+
+    pub fn get_var(&self, var: &str) -> Result<&Option<Type>, Error> {
+        self.envs
+            .iter()
+            .rev()
+            .find_map(|env| match env.get_var(var) {
+                Ok(ty) => Some(ty),
+                Err(_) => None,
+            })
+            .ok_or(Error::VarNotFound { var: var.to_owned() })
+    }
+
+    pub fn get_def_var(&self, var: &str) -> Result<&Type, Error> {
+        match self.get_var(var) {
+            Ok(Some(ty)) => Ok(ty),
+            Ok(None) => Err(Error::UndefVar { var: var.to_owned() }),
+            Err(err) => Err(err),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     PrimType(PrimType),
