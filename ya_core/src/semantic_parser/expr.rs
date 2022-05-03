@@ -290,6 +290,35 @@ pub struct BinaryExpr {
     pub rhs: Box<Expr>,
 }
 
+impl ParseSynExpr for BinaryExpr {
+    type SynExpr = syn::BinaryExpr;
+
+    fn parse(envs: &EnvStack, expr: &Self::SynExpr) -> Expr {
+        let op = expr.op.op.clone();
+        let lhs = Box::new(Expr::parse(envs, &*expr.lhs));
+        let rhs = Box::new(Expr::parse(envs, &*expr.rhs));
+
+        let (errs, ty) = match envs.get_bin_op_prec(&BinOp {
+            op: op.clone(),
+            lhs: lhs.ty.clone(),
+            rhs: rhs.ty.clone(),
+        }) {
+            Ok(op) => (vec![], op.ty.clone()),
+            Err(err) => (vec![err], Type::PrimType(PrimType::Unit)),
+        };
+
+        Expr {
+            ty,
+            kind: ExprKind::Binary(BinaryExpr {
+                op,
+                lhs,
+                rhs,
+            }),
+            errs,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum UnaryOpPos {
     Pre,

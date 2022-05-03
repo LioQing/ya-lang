@@ -1,4 +1,4 @@
-#[derive(strum::EnumString, strum::AsRefStr, Debug, PartialEq, Copy, Clone)]
+#[derive(strum::EnumString, strum::AsRefStr, Debug, PartialEq, Eq, Copy, Clone, Hash)]
 #[strum(serialize_all = "lowercase")]
 pub enum PrimType {
     #[strum(disabled)]

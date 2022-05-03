@@ -35,6 +35,9 @@ pub enum Error {
     #[error("Type not found {ty}")]
     TypeNotFound { ty: String },
 
+    #[error("Binary operator not found {lhs:?} {op} {rhs:?}")]
+    BinOpNotFound { op: String, lhs: Type, rhs: Type },
+
     #[error("Undefined variable {var}")]
     UndefVar { var: String },
 }
@@ -55,6 +58,8 @@ impl Parser {
             envs: vec![Env {
                 tys: HashMap::new(),
                 vars: HashMap::new(),
+                bin_ops: [
+                ].into(),
             }],
         };
         let mut errs = vec![];

@@ -1,9 +1,25 @@
 use super::*;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct BinOp {
+    pub op: String,
+    pub lhs: Type,
+    pub rhs: Type,
+}
+
+pub type Prec = u8;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct OpInfo {
+    pub ty: Type,
+    pub prec: Prec,
+}
+
+#[derive(Debug, Clone)]
 pub struct Env {
     pub tys: HashMap<String, Type>,
     pub vars: HashMap<String, Option<Type>>,
+    pub bin_ops: HashMap<BinOp, OpInfo>,
 }
 
 impl Env {
@@ -26,9 +42,19 @@ impl Env {
             Err(err) => Err(err),
         }
     }
+
+    pub fn get_bin_op_prec(&self, bin_op: &BinOp) -> Result<&OpInfo, Error> {
+        self.bin_ops
+            .get(bin_op)
+            .ok_or(Error::BinOpNotFound {
+                op: bin_op.op.clone(),
+                lhs: bin_op.lhs.clone(),
+                rhs: bin_op.rhs.clone(),
+            })
+    }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct EnvStack {
     pub envs: Vec<Env>,
 }
@@ -63,12 +89,33 @@ impl EnvStack {
             Err(err) => Err(err),
         }
     }
+
+    pub fn get_bin_op_prec(&self, bin_op: &BinOp) -> Result<&OpInfo, Error> {
+        self.envs
+            .iter()
+            .rev()
+            .find_map(|env| match env.get_bin_op_prec(bin_op) {
+                Ok(prec) => Some(prec),
+                Err(_) => None,
+            })
+            .ok_or(Error::BinOpNotFound {
+                op: bin_op.op.clone(),
+                lhs: bin_op.lhs.clone(),
+                rhs: bin_op.rhs.clone(),
+            })
+    }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Field {
+    pub name: String,
+    pub ty: Type,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Type {
     PrimType(PrimType),
-    Struct(HashMap<String, Type>),
+    Struct(Vec<Field>),
     Tuple(Vec<Type>),
     Func(FuncType),
 }
@@ -77,7 +124,7 @@ impl From<&syn::token::TypeName> for Type {
     fn from(ty: &syn::token::TypeName) -> Self {
         match ty {
             syn::token::TypeName::PrimType(prim_type) => Type::PrimType(*prim_type),
-            syn::token::TypeName::Struct(_) => Type::Struct(HashMap::new()),
+            syn::token::TypeName::Struct(_) => Type::Struct(vec![]),
             syn::token::TypeName::Tuple(tys) => Type::Tuple(tys.iter().map(|ty| ty.into()).collect()),
         }
     }
@@ -123,7 +170,7 @@ impl From<&syn::token::Lit> for Result<PrimType, Error> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct FuncType {
     pub params: Vec<Type>,
     pub ret: Box<Type>,
