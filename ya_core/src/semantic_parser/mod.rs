@@ -3,6 +3,9 @@ use crate::prim_type::PrimType;
 use std::collections::HashMap;
 use thiserror::Error;
 
+#[cfg(test)]
+mod tests;
+
 pub mod expr;
 pub mod env;
 
@@ -56,22 +59,9 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn parse(syn_items: &Vec<syn::Item>) -> Self {
+    pub fn parse(syn_items: &Vec<syn::Item>, env: Env) -> Self {
         let mut global = EnvStack {
-            envs: vec![Env {
-                tys: HashMap::new(),
-                vars: HashMap::new(),
-                bin_ops: [ // TODO: add built-in operators
-                    bin_op_info!(
-                        Type::PrimType(PrimType::I32), "+", Type::PrimType(PrimType::I32) => Type::PrimType(PrimType::I32);
-                        0x5, Ltr
-                    ),
-                    bin_op_info!(
-                        Type::PrimType(PrimType::I32), "*", Type::PrimType(PrimType::I32) => Type::PrimType(PrimType::I32);
-                        0x4, Ltr
-                    ),
-                ].into(),
-            }],
+            envs: vec![env],
         };
         let mut errs = vec![];
 

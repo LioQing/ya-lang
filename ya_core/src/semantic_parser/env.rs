@@ -1,39 +1,6 @@
 use super::*;
 
-macro_rules! bin_op_info {
-    ($lhs:expr, $op:literal, $rhs:expr => $res:expr; $prec:literal, $assoc:ident) => {
-        (
-            BinOp { op: $op.to_owned(), lhs: $lhs, rhs: $rhs },
-            OpInfo { ty: $res, prec: $prec, assoc: OpAssoc::$assoc },
-        )
-    };
-}
-
-pub(super) use bin_op_info;
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct BinOp {
-    pub op: String,
-    pub lhs: Type,
-    pub rhs: Type,
-}
-
-pub type OpPrec = u8;
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
-pub enum OpAssoc {
-    Ltr,
-    Rtl,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct OpInfo {
-    pub ty: Type,
-    pub prec: OpPrec,
-    pub assoc: OpAssoc,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Env {
     pub tys: HashMap<String, Type>,
     pub vars: HashMap<String, Option<Type>>,
@@ -67,14 +34,30 @@ impl Env {
         }
     }
 
-    pub fn get_bin_op_prec(&self, bin_op: &BinOp) -> Result<&OpInfo, Error> {
-        self.bin_ops
-            .get(bin_op)
-            .ok_or(Error::BinOpNotFound {
-                op: bin_op.op.clone(),
-                lhs: bin_op.lhs.clone(),
-                rhs: bin_op.rhs.clone(),
-            })
+    // Issue #2
+    pub fn get_bin_op_info(&self, bin_op: &BinOp) -> Result<OpInfo, Error> {
+        match bin_op.op.as_str() {
+            // special case: "=" operator
+            "=" => match bin_op.lhs.eq(&bin_op.rhs) {
+                true => {
+                    Ok(OpInfo { prec: 0xf, ty: bin_op.lhs.clone(), assoc: OpAssoc::Ltr })
+                },
+                false => {
+                    Err(Error::AssignmentMismatchedOperandTypes {
+                        lhs: bin_op.lhs.clone(),
+                        rhs: bin_op.rhs.clone(),
+                    })
+                },
+            },
+            _ => self.bin_ops
+                .get(bin_op)
+                .map(|op_info| op_info.clone())
+                .ok_or(Error::BinOpNotFound {
+                    op: bin_op.op.clone(),
+                    lhs: bin_op.lhs.clone(),
+                    rhs: bin_op.rhs.clone(),
+                })
+        }
     }
 }
 
@@ -125,11 +108,12 @@ impl EnvStack {
         }
     }
 
-    pub fn get_bin_op_prec(&self, bin_op: &BinOp) -> Result<&OpInfo, Error> {
+    // Issue #2
+    pub fn get_bin_op_info(&self, bin_op: &BinOp) -> Result<OpInfo, Error> {
         self.envs
             .iter()
             .rev()
-            .find_map(|env| match env.get_bin_op_prec(bin_op) {
+            .find_map(|env| match env.get_bin_op_info(bin_op) {
                 Ok(prec) => Some(prec),
                 Err(_) => None,
             })
@@ -149,7 +133,7 @@ pub struct Field {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Type {
-    PrimType(PrimType),
+    Prim(PrimType),
     Struct(Vec<Field>),
     Tuple(Vec<Type>),
     Func(FuncType),
@@ -158,7 +142,7 @@ pub enum Type {
 impl From<&syn::token::TypeName> for Type {
     fn from(ty: &syn::token::TypeName) -> Self {
         match ty {
-            syn::token::TypeName::PrimType(prim_type) => Type::PrimType(*prim_type),
+            syn::token::TypeName::PrimType(prim_type) => Type::Prim(*prim_type),
             syn::token::TypeName::Struct(_) => Type::Struct(vec![]),
             syn::token::TypeName::Tuple(tys) => Type::Tuple(tys.iter().map(|ty| ty.into()).collect()),
         }
@@ -180,8 +164,8 @@ impl From<&syn::token::Lit> for Result<PrimType, Error> {
                 ..
             } => {
                 match (*kind, suffix.as_str()) {
-                    (syn::token::LitKind::Integer, "" )   => Ok(PrimType::I32),
-                    (syn::token::LitKind::Float  , "" )   => Ok(PrimType::F32),
+                    (syn::token::LitKind::Integer, "")    => Ok(PrimType::I32),
+                    (syn::token::LitKind::Float  , "")    => Ok(PrimType::F32),
                     (syn::token::LitKind::Integer, "i8" ) => Ok(PrimType::I8 ),
                     (syn::token::LitKind::Integer, "i16") => Ok(PrimType::I16),
                     (syn::token::LitKind::Integer, "i32") => Ok(PrimType::I32),
@@ -208,14 +192,48 @@ impl From<&syn::token::Lit> for Result<PrimType, Error> {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct FuncType {
     pub params: Vec<Type>,
-    pub ret: Box<Type>,
+    pub ret_ty: Box<Type>,
 }
 
 impl From<&syn::FuncExpr> for FuncType {
     fn from(expr: &syn::FuncExpr) -> Self {
         FuncType {
             params: expr.params.iter().map(|p| Type::from(&p.ty)).collect(),
-            ret: Box::new(Type::from(&expr.ret_ty)),
+            ret_ty: Box::new(Type::from(&expr.ret_ty)),
         }
     }
+}
+
+#[allow(unused_macros)]
+macro_rules! bin_op_info {
+    ($lhs:expr, $op:literal, $rhs:expr => $res:expr; $prec:literal, $assoc:ident) => {
+        (
+            BinOp { op: $op.to_owned(), lhs: $lhs, rhs: $rhs },
+            OpInfo { ty: $res, prec: $prec, assoc: OpAssoc::$assoc },
+        )
+    };
+}
+
+pub(super) use bin_op_info;
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct BinOp {
+    pub op: String,
+    pub lhs: Type,
+    pub rhs: Type,
+}
+
+pub type OpPrec = u8;
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
+pub enum OpAssoc {
+    Ltr,
+    Rtl,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct OpInfo {
+    pub ty: Type,
+    pub prec: OpPrec,
+    pub assoc: OpAssoc,
 }

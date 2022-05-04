@@ -14,4 +14,4 @@
 /* c LTR */ "&&"
 /* d LTR */ "||"
 /* e RTL */ 
-/* f RTL */ "=" // strictly overloadable for assignment of same types
+/* f RTL */ "=" // not overloadable
