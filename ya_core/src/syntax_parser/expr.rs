@@ -20,11 +20,11 @@ pub enum Expr {
     /** call: `$expr $tuple` */
     Call(CallExpr),
 
-    /** binary: `$expr $op $expr` */
-    Binary(BinaryExpr),
+    /** binary operation: `$expr $op $expr` */
+    BinOp(BinOpExpr),
 
-    /** unary: `$op $expr` or `$expr $op` */
-    Unary(UnaryExpr),
+    /** unary operation: `$op $expr` or `$expr $op` */
+    UnOp(UnOpExpr),
 
     /** function: `($[$var_ty_decl,]* $[,]?) $[-> $ty]? $block_expr` */
     Func(FuncExpr),
@@ -76,7 +76,7 @@ impl Expr {
                 }
             },
             Ok(lexer::Token::Operator { .. }) => {
-                Ok(Self::Unary(UnaryExpr::parse_pre(lexer)?))
+                Ok(Self::UnOp(UnOpExpr::parse_pre(lexer)?))
             },
             _ => {
                 Err(Error::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) })
@@ -91,10 +91,10 @@ impl Expr {
                 Ok(lexer::Token::Operator { .. }) => {
                     match lexer.peek_nth_token(1) {
                         Ok(t) if Self::is_expr(t) => {
-                            expr = Self::Binary(BinaryExpr::parse(lexer, expr)?);
+                            expr = Self::BinOp(BinOpExpr::parse(lexer, expr)?);
                         },
                         _ => {
-                            expr = Self::Unary(UnaryExpr::parse_post(lexer, expr)?);
+                            expr = Self::UnOp(UnOpExpr::parse_post(lexer, expr)?);
                         },
                     }
                 },
@@ -228,13 +228,13 @@ impl CallExpr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct BinaryExpr {
+pub struct BinOpExpr {
     pub op: token::Operator,
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
 }
 
-impl BinaryExpr {
+impl BinOpExpr {
     pub fn parse(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, Error> {
         let op = token::Operator::parse(lexer)?;
         let rhs = Expr::parse(lexer)?;
@@ -254,13 +254,13 @@ pub enum UnaryOpPos {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct UnaryExpr {
+pub struct UnOpExpr {
     pub op: token::Operator,
     pub op_pos: UnaryOpPos,
     pub expr: Box<Expr>,
 }
 
-impl UnaryExpr {
+impl UnOpExpr {
     pub fn parse_pre(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         let op = token::Operator::parse(lexer)?;
         let expr = Expr::parse(lexer)?;

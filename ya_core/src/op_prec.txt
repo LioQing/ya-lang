@@ -1,4 +1,5 @@
-/* 0 LTR */ "."
+// lower number is higher priority
+/* 0 LTR */ "." // not overloadable
 /* 1 LTR */ 
 /* 2 RTL */ 
 /* 3 RTL */ 
@@ -13,4 +14,4 @@
 /* c LTR */ "&&"
 /* d LTR */ "||"
 /* e RTL */ 
-/* f RTL */ "="
+/* f RTL */ "=" // strictly overloadable for assignment of same types

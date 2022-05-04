@@ -29,6 +29,9 @@ pub enum Error {
     #[error("Mismatched argument type: expected {expected:?}, found {found:?}")]
     MismatchedArgument { expected: Option<Type>, found: Option<Type> },
 
+    #[error("Assignment operation `=` with mismatched operand types {lhs:?} and {rhs:?}")]
+    AssignmentMismatchedOperandTypes { lhs: Type, rhs: Type },
+
     #[error("Variable not found {var}")]
     VarNotFound { var: String },
 
@@ -48,7 +51,7 @@ pub enum Error {
 /// Parse the parse tree into an AST.
 pub struct Parser {
     pub global_env: EnvStack,
-    pub funcs: Vec<BlockExpr>,
+    pub funcs: Vec<Expr>,
     pub errs: Vec<Error>,
 }
 
@@ -58,7 +61,15 @@ impl Parser {
             envs: vec![Env {
                 tys: HashMap::new(),
                 vars: HashMap::new(),
-                bin_ops: [
+                bin_ops: [ // TODO: add built-in operators
+                    bin_op_info!(
+                        Type::PrimType(PrimType::I32), "+", Type::PrimType(PrimType::I32) => Type::PrimType(PrimType::I32);
+                        0x5, Ltr
+                    ),
+                    bin_op_info!(
+                        Type::PrimType(PrimType::I32), "*", Type::PrimType(PrimType::I32) => Type::PrimType(PrimType::I32);
+                        0x4, Ltr
+                    ),
                 ].into(),
             }],
         };
@@ -80,7 +91,7 @@ impl Parser {
                         },
                         _ => {
                             errs.push(Error::UndefVar {
-                                var: "TEMPORARY ERROR".to_owned(),
+                                var: "NOT A LET EITHER NOT IMPLEMENTED OR IDK".to_owned(),
                             });
                             ("".to_owned(), None)
                         }
@@ -108,8 +119,8 @@ impl Parser {
                     };
 
                     // add function to be parsed later
-                    if let (Some(Type::Func(_)), syn::Expr::Block(block)) = (&ty, expr.rhs.as_ref()) {
-                        funcs.push(block);
+                    if let (Some(Type::Func(_)), syn::Expr::Func(func)) = (&ty, expr.rhs.as_ref()) {
+                        funcs.push(func.body.as_ref());
                     }
 
                     global.envs.first_mut().unwrap().vars.insert(name, ty);
@@ -118,14 +129,15 @@ impl Parser {
             }
         }
 
-        // // second scan: function codes
-        // let funcs = for expr in funcs {
-
-        // };
+        // second scan: function body codes
+        let funcs = funcs
+            .iter()
+            .map(|expr| BlockExpr::parse(&mut global, expr))
+            .collect();
 
         Self {
             global_env: global,
-            funcs: vec![], // TODO: implement function body parsing
+            funcs,
             errs,
         }
     }

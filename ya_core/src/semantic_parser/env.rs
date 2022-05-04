@@ -1,5 +1,16 @@
 use super::*;
 
+macro_rules! bin_op_info {
+    ($lhs:expr, $op:literal, $rhs:expr => $res:expr; $prec:literal, $assoc:ident) => {
+        (
+            BinOp { op: $op.to_owned(), lhs: $lhs, rhs: $rhs },
+            OpInfo { ty: $res, prec: $prec, assoc: OpAssoc::$assoc },
+        )
+    };
+}
+
+pub(super) use bin_op_info;
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BinOp {
     pub op: String,
@@ -7,12 +18,19 @@ pub struct BinOp {
     pub rhs: Type,
 }
 
-pub type Prec = u8;
+pub type OpPrec = u8;
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
+pub enum OpAssoc {
+    Ltr,
+    Rtl,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct OpInfo {
     pub ty: Type,
-    pub prec: Prec,
+    pub prec: OpPrec,
+    pub assoc: OpAssoc,
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +50,12 @@ impl Env {
     pub fn get_var(&self, var: &str) -> Result<&Option<Type>, Error> {
         self.vars
             .get(var)
+            .ok_or(Error::VarNotFound { var: var.to_owned() })
+    }
+
+    pub fn get_var_mut(&mut self, var: &str) -> Result<&mut Option<Type>, Error> {
+        self.vars
+            .get_mut(var)
             .ok_or(Error::VarNotFound { var: var.to_owned() })
     }
 
@@ -76,6 +100,17 @@ impl EnvStack {
             .iter()
             .rev()
             .find_map(|env| match env.get_var(var) {
+                Ok(ty) => Some(ty),
+                Err(_) => None,
+            })
+            .ok_or(Error::VarNotFound { var: var.to_owned() })
+    }
+
+    pub fn get_var_mut(&mut self, var: &str) -> Result<&mut Option<Type>, Error> {
+        self.envs
+            .iter_mut()
+            .rev()
+            .find_map(|env| match env.get_var_mut(var) {
                 Ok(ty) => Some(ty),
                 Err(_) => None,
             })

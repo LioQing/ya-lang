@@ -5,7 +5,7 @@ fn empty_func() {
     let parser = Parser::parse("let main = () {}");
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinaryExpr {
+    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -31,7 +31,7 @@ fn hello_world_func() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinaryExpr {
+    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "hello_world".to_owned() },
@@ -70,7 +70,7 @@ fn add_i32_func() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinaryExpr {
+    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "add".to_owned() },
@@ -104,7 +104,7 @@ fn add_i32_func() {
                         ],
                     })
                 ],
-                expr: Some(Box::new(Expr::Binary(BinaryExpr {
+                expr: Some(Box::new(Expr::BinOp(BinOpExpr {
                     op: token::Operator { op: "+".to_owned() },
                     lhs: Box::new(Expr::VarName(token::VarName { name: "a".to_owned() })),
                     rhs: Box::new(Expr::VarName(token::VarName { name: "b".to_owned() })),
@@ -124,7 +124,7 @@ fn extreme_empty_func() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinaryExpr {
+    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -153,7 +153,7 @@ fn func_params_ret_and_let_expr() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinaryExpr {
+    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -181,7 +181,7 @@ fn func_params_ret_and_let_expr() {
                         var: token::VarName { name: "b".to_owned() },
                         ty: Some(token::TypeName::PrimType(PrimType::I32)),
                     }),
-                    Expr::Binary(BinaryExpr {
+                    Expr::BinOp(BinOpExpr {
                         op: token::Operator { op: "=".to_owned() },
                         lhs: Box::new(Expr::Let(LetExpr {
                             var: token::VarName { name: "a".to_owned() },
@@ -189,7 +189,7 @@ fn func_params_ret_and_let_expr() {
                         })),
                         rhs: Box::new(Expr::VarName(token::VarName { name: "b".to_owned() })),
                     }),
-                    Expr::Binary(BinaryExpr {
+                    Expr::BinOp(BinOpExpr {
                         op: token::Operator { op: "=".to_owned() },
                         lhs: Box::new(Expr::Let(LetExpr {
                             var: token::VarName { name: "a".to_owned() },
@@ -213,7 +213,7 @@ fn tuple_and_unit() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinaryExpr {
+    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -232,7 +232,7 @@ fn tuple_and_unit() {
                 stmts: vec![],
                 expr: Some(Box::new(Expr::Tuple(TupleExpr {
                     items: vec![
-                        Expr::Binary(BinaryExpr {
+                        Expr::BinOp(BinOpExpr {
                             op: token::Operator { op: "+".to_owned() },
                             lhs: Box::new(Expr::VarName(token::VarName { name: "a".to_owned() })),
                             rhs: Box::new(Expr::VarName(token::VarName { name: "b".to_owned() })),
