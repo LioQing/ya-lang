@@ -7,10 +7,10 @@ fn empty_func() {
         tys: HashMap::new(),
         vars: HashMap::new(),
         bin_ops: HashMap::new(),
+        un_ops: HashMap::new(),
     });
 
-    assert_eq!(sem_parser.global_env.envs.len(), 1);
-    assert_eq!(sem_parser.global_env.envs[0], Env {
+    assert_eq!(sem_parser.global_env, Env {
         tys: HashMap::new(),
         vars: [
             ("main".to_owned(), Some(Type::Func(FuncType {
@@ -19,5 +19,6 @@ fn empty_func() {
             })))
         ].into(),
         bin_ops: HashMap::new(),
+        un_ops: HashMap::new(),
     });
 }

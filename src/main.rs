@@ -36,6 +36,12 @@ fn main() {
                     0x4, Ltr
                 ),
             ].into(),
+            un_ops: [
+                (
+                    semantic_parser::UnOp { op: "!".to_owned(), op_pos: semantic_parser::UnOpPos::Pre, ty: Type::Prim(PrimType::I32) },
+                    semantic_parser::Type::Prim(PrimType::I32),
+                ),
+            ].into(),
         }
     );
 

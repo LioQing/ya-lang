@@ -33,7 +33,31 @@ pub enum Expr {
 impl Expr {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         // primary expression
-        let mut expr = match lexer.peek_token() {
+        let mut expr = Self::parse_prim(lexer)?;
+
+        loop {
+            match lexer.peek_token() {
+                Ok(lexer::Token::Bracket { raw: '(', .. }) => {
+                    expr = Self::Call(CallExpr::parse(lexer, expr)?);
+                },
+                Ok(lexer::Token::Operator { .. }) => {
+                    match lexer.peek_nth_token(1) {
+                        Ok(t) if Self::is_expr(t) => {
+                            expr = Self::BinOp(BinOpExpr::parse(lexer, expr)?);
+                        },
+                        _ => {
+                            expr = Self::UnOp(UnOpExpr::parse_suf(lexer, expr)?);
+                        },
+                    }
+                },
+                Err(_) => break Err(lexer.next_token().err().unwrap().into()),
+                _ => break Ok(expr),
+            }
+        }
+    }
+
+    pub fn parse_prim(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+        match lexer.peek_token() {
             Ok(lexer::Token::Identifier { raw }) if raw.as_str() == "let" => {
                 Ok(Self::Let(LetExpr::parse(lexer)?))
             },
@@ -76,31 +100,11 @@ impl Expr {
                 }
             },
             Ok(lexer::Token::Operator { .. }) => {
-                Ok(Self::UnOp(UnOpExpr::parse_pre(lexer)?))
+                Ok(UnOpExpr::parse_pre(lexer)?)
             },
             _ => {
                 Err(Error::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) })
             },
-        }?;
-
-        loop {
-            match lexer.peek_token() {
-                Ok(lexer::Token::Bracket { raw: '(', .. }) => {
-                    expr = Self::Call(CallExpr::parse(lexer, expr)?);
-                },
-                Ok(lexer::Token::Operator { .. }) => {
-                    match lexer.peek_nth_token(1) {
-                        Ok(t) if Self::is_expr(t) => {
-                            expr = Self::BinOp(BinOpExpr::parse(lexer, expr)?);
-                        },
-                        _ => {
-                            expr = Self::UnOp(UnOpExpr::parse_post(lexer, expr)?);
-                        },
-                    }
-                },
-                Err(_) => break Err(lexer.next_token().err().unwrap().into()),
-                _ => break Ok(expr),
-            }
         }
     }
 
@@ -108,10 +112,10 @@ impl Expr {
         match token {
             &lexer::Token::Identifier { ref raw } if raw.as_str() == "let" => true,
             &lexer::Token::Numeric { .. } |
-            &lexer::Token::StringChar { .. } => true,
-            &lexer::Token::Identifier { .. } => true,
-            &lexer::Token::Bracket { raw: '{', .. } => true,
-            &lexer::Token::Bracket { raw: '(', .. } => true,
+            &lexer::Token::StringChar { .. } |
+            &lexer::Token::Identifier { .. } |
+            &lexer::Token::Bracket { raw: '{', .. } |
+            &lexer::Token::Bracket { raw: '(', .. } |
             &lexer::Token::Operator { .. } => true,
             _ => false,
         }
@@ -248,36 +252,51 @@ impl BinOpExpr {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum UnaryOpPos {
+pub enum UnOpPos {
     Pre,
-    Post,
+    Suf,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct UnOpExpr {
     pub op: token::Operator,
-    pub op_pos: UnaryOpPos,
+    pub op_pos: UnOpPos,
     pub expr: Box<Expr>,
 }
 
 impl UnOpExpr {
-    pub fn parse_pre(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+    pub fn parse_pre(lexer: &mut lexer::Lexer) -> Result<Expr, Error> {
         let op = token::Operator::parse(lexer)?;
         let expr = Expr::parse(lexer)?;
 
-        Ok(Self {
-            op,
-            op_pos: UnaryOpPos::Pre,
-            expr: Box::new(expr),
-        })
+        match expr {
+            Expr::BinOp(BinOpExpr { op: bin_op, lhs, rhs }) => {
+                Ok(Expr::BinOp(BinOpExpr {
+                    op: bin_op,
+                    lhs: Box::new(Expr::UnOp(Self {
+                        op,
+                        op_pos: UnOpPos::Pre,
+                        expr: lhs,
+                    })),
+                    rhs,
+                }))
+            },
+            _ => {
+                Ok(Expr::UnOp(Self {
+                    op,
+                    op_pos: UnOpPos::Pre,
+                    expr: Box::new(expr),
+                }))
+            }
+        }
     }
 
-    pub fn parse_post(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, Error> {
+    pub fn parse_suf(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, Error> {
         let op = token::Operator::parse(lexer)?;
 
         Ok(Self {
             op,
-            op_pos: UnaryOpPos::Post,
+            op_pos: UnOpPos::Suf,
             expr: Box::new(expr),
         })
     }

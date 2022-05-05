@@ -5,12 +5,25 @@ use itertools::{
 
 use super::*;
 
-pub trait ParseSynExpr {
+pub trait ParseSynExpr where Self: Sized {
     type SynExpr;
 
-    fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr
-    where
-        Self: Sized;
+    fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr;
+
+    fn parse_with_local_vars(envs: &mut EnvStack, expr: &Self::SynExpr, local_vars: HashMap<String, Option<Type>>) -> Expr {
+        envs.envs.push(Env {
+            tys: HashMap::new(),
+            vars: local_vars,
+            bin_ops: HashMap::new(),
+            un_ops: HashMap::new(),
+        });
+
+        let expr = Self::parse(envs, expr);
+
+        envs.envs.pop();
+
+        expr
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -43,6 +56,7 @@ impl ParseSynExpr for Expr {
             syn::Expr::Tuple(expr) => TupleExpr::parse(envs, expr),
             syn::Expr::Call(expr) => CallExpr::parse(envs, expr),
             syn::Expr::BinOp(expr) => BinOpExpr::parse(envs, expr),
+            syn::Expr::UnOp(expr) => UnOpExpr::parse(envs, expr),
             _ => unimplemented!(),
         }
     }
@@ -327,8 +341,8 @@ impl BinOpExpr {
             };
 
             let (lhs_bin_op_info, rhs_bin_op_info) = match (
-                envs.get_bin_op_info(&lhs_bin_op),
-                envs.get_bin_op_info(&rhs_bin_op),
+                envs.get_bin_op(&lhs_bin_op),
+                envs.get_bin_op(&rhs_bin_op),
             ) {
                 (Err(err1), Err(err2)) => {
                     errs.push(err1);
@@ -439,7 +453,7 @@ impl BinOpExpr {
             rhs: rhs.ty.clone(),
         };
 
-        envs.get_bin_op_info(&bin_op)
+        envs.get_bin_op(&bin_op)
             .map_err(|err| errs.push(err))
             .map_or(Type::Prim(PrimType::Unit), |op| op.ty.clone())
     }
@@ -479,17 +493,47 @@ impl ParseSynExpr for BinOpExpr {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum UnaryOpPos {
-    Pre,
-    Post,
+impl From<syn::UnOpPos> for UnOpPos {
+    fn from(pos: syn::UnOpPos) -> Self {
+        if pos == syn::UnOpPos::Pre { UnOpPos::Pre } else { UnOpPos::Suf }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct UnOpExpr {
     pub op: String,
-    pub op_pos: UnaryOpPos,
+    pub op_pos: UnOpPos,
     pub expr: Box<Expr>,
+}
+
+impl ParseSynExpr for UnOpExpr {
+    type SynExpr = syn::UnOpExpr;
+
+    fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+        let mut errs = vec![];
+
+        let op  = expr.op.op.clone();
+        let op_pos: UnOpPos = expr.op_pos.into();
+        let expr = Box::new(Expr::parse(envs, &*expr.expr));
+
+        let ty = envs.get_un_op(&UnOp {
+            op: op.clone(),
+            op_pos: op_pos.clone(),
+            ty: expr.ty.clone(),
+        })
+        .map_err(|err| errs.push(err))
+        .map_or(Type::Prim(PrimType::Unit), |ty| ty.clone());
+
+        Expr {
+            ty,
+            kind: ExprKind::UnOp(UnOpExpr {
+                op,
+                op_pos,
+                expr,
+            }),
+            errs,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -497,3 +541,17 @@ pub struct FuncExpr {
     pub ty: FuncType,
     pub id: usize,
 }
+
+// impl ParseSynExpr for FuncExpr {
+//     type SynExpr = syn::FuncExpr;
+
+//     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+
+//         Expr {
+//             ty,
+//             kind: ExprKind::Func(FuncExpr {
+//             }),
+//             errs: vec![],
+//         }
+//     }
+// }

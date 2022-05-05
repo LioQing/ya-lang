@@ -44,6 +44,12 @@ pub enum Error {
     #[error("Binary operator not found {lhs:?} {op} {rhs:?}")]
     BinOpNotFound { op: String, lhs: Type, rhs: Type },
 
+    #[error("Prefix unary operator not found {op} {ty:?}")]
+    PrefixUnOpNotFound { op: String, ty: Type },
+
+    #[error("Suffix unary operator not found {ty:?} {op}")]
+    SuffixUnOpNotFound { ty: Type, op: String },
+
     #[error("Undefined variable {var}")]
     UndefVar { var: String },
 }
@@ -53,7 +59,7 @@ pub enum Error {
 /// Performs semantic analysis.
 /// Parse the parse tree into an AST.
 pub struct Parser {
-    pub global_env: EnvStack,
+    pub global_env: Env,
     pub funcs: Vec<Expr>,
     pub errs: Vec<Error>,
 }
@@ -79,12 +85,7 @@ impl Parser {
                                     .map(|ty| ty.into()),
                             )
                         },
-                        _ => {
-                            errs.push(Error::UndefVar {
-                                var: "NOT A LET EITHER NOT IMPLEMENTED OR IDK".to_owned(),
-                            });
-                            ("".to_owned(), None)
-                        }
+                        _ => unimplemented!(),
                     };
                     
                     let deduced_ty = match Expr::get_ty_from_syn(&global, expr.rhs.as_ref())
@@ -126,7 +127,7 @@ impl Parser {
             .collect();
 
         Self {
-            global_env: global,
+            global_env: global.envs.pop().unwrap(),
             funcs,
             errs,
         }

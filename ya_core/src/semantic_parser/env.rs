@@ -5,6 +5,7 @@ pub struct Env {
     pub tys: HashMap<String, Type>,
     pub vars: HashMap<String, Option<Type>>,
     pub bin_ops: HashMap<BinOp, OpInfo>,
+    pub un_ops: HashMap<UnOp, Type>,
 }
 
 impl Env {
@@ -35,7 +36,7 @@ impl Env {
     }
 
     // Issue #2
-    pub fn get_bin_op_info(&self, bin_op: &BinOp) -> Result<OpInfo, Error> {
+    pub fn get_bin_op(&self, bin_op: &BinOp) -> Result<OpInfo, Error> {
         match bin_op.op.as_str() {
             // special case: "=" operator
             "=" => match bin_op.lhs.eq(&bin_op.rhs) {
@@ -49,7 +50,8 @@ impl Env {
                     })
                 },
             },
-            _ => self.bin_ops
+            _ => {
+                self.bin_ops
                 .get(bin_op)
                 .map(|op_info| op_info.clone())
                 .ok_or(Error::BinOpNotFound {
@@ -57,7 +59,24 @@ impl Env {
                     lhs: bin_op.lhs.clone(),
                     rhs: bin_op.rhs.clone(),
                 })
+            },
         }
+    }
+
+    pub fn get_un_op(&self, un_op: &UnOp) -> Result<Type, Error> {
+        self.un_ops
+            .get(un_op)
+            .map(|op_info| op_info.clone())
+            .ok_or(match un_op.op_pos {
+                UnOpPos::Pre => Error::PrefixUnOpNotFound {
+                    op: un_op.op.clone(),
+                    ty: un_op.ty.clone(),
+                },
+                UnOpPos::Suf => Error::SuffixUnOpNotFound {
+                    ty: un_op.ty.clone(),
+                    op: un_op.op.clone(),
+                },
+            })
     }
 }
 
@@ -109,11 +128,11 @@ impl EnvStack {
     }
 
     // Issue #2
-    pub fn get_bin_op_info(&self, bin_op: &BinOp) -> Result<OpInfo, Error> {
+    pub fn get_bin_op(&self, bin_op: &BinOp) -> Result<OpInfo, Error> {
         self.envs
             .iter()
             .rev()
-            .find_map(|env| match env.get_bin_op_info(bin_op) {
+            .find_map(|env| match env.get_bin_op(bin_op) {
                 Ok(prec) => Some(prec),
                 Err(_) => None,
             })
@@ -121,6 +140,26 @@ impl EnvStack {
                 op: bin_op.op.clone(),
                 lhs: bin_op.lhs.clone(),
                 rhs: bin_op.rhs.clone(),
+            })
+    }
+
+    pub fn get_un_op(&self, un_op: &UnOp) -> Result<Type, Error> {
+        self.envs
+            .iter()
+            .rev()
+            .find_map(|env| match env.get_un_op(un_op) {
+                Ok(prec) => Some(prec),
+                Err(_) => None,
+            })
+            .ok_or(match un_op.op_pos {
+                UnOpPos::Pre => Error::PrefixUnOpNotFound {
+                    op: un_op.op.clone(),
+                    ty: un_op.ty.clone(),
+                },
+                UnOpPos::Suf => Error::SuffixUnOpNotFound {
+                    ty: un_op.ty.clone(),
+                    op: un_op.op.clone(),
+                },
             })
     }
 }
@@ -221,6 +260,19 @@ pub struct BinOp {
     pub op: String,
     pub lhs: Type,
     pub rhs: Type,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
+pub enum UnOpPos {
+    Pre,
+    Suf,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct UnOp {
+    pub op: String,
+    pub op_pos: UnOpPos,
+    pub ty: Type,
 }
 
 pub type OpPrec = u8;
