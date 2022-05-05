@@ -21,31 +21,31 @@ fn main() {
     println!("{:#?}", synt_parser.items);
     println!("{:#?}", synt_parser.errs);
 
-    let sem_parser = semantic_parser::Parser::parse(
-        &synt_parser.items,
-        semantic_parser::Env {
-            tys: HashMap::new(),
-            vars: HashMap::new(),
-            bin_ops: [ // TODO: add built-in operators
-                bin_op_info!(
-                    Type::Prim(PrimType::I32), "+", Type::Prim(PrimType::I32) => Type::Prim(PrimType::I32);
-                    0x5, Ltr
-                ),
-                bin_op_info!(
-                    Type::Prim(PrimType::I32), "*", Type::Prim(PrimType::I32) => Type::Prim(PrimType::I32);
-                    0x4, Ltr
-                ),
-            ].into(),
-            un_ops: [
-                (
-                    semantic_parser::UnOp { op: "!".to_owned(), op_pos: semantic_parser::UnOpPos::Pre, ty: Type::Prim(PrimType::I32) },
-                    semantic_parser::Type::Prim(PrimType::I32),
-                ),
-            ].into(),
-        }
-    );
+    // let sem_parser = semantic_parser::Parser::parse(
+    //     &synt_parser.items,
+    //     semantic_parser::Env {
+    //         tys: HashMap::new(),
+    //         vars: HashMap::new(),
+    //         bin_ops: [ // TODO: add built-in operators
+    //             bin_op_info!(
+    //                 Type::Prim(PrimType::I32), "+", Type::Prim(PrimType::I32) => Type::Prim(PrimType::I32);
+    //                 0x5, Ltr
+    //             ),
+    //             bin_op_info!(
+    //                 Type::Prim(PrimType::I32), "*", Type::Prim(PrimType::I32) => Type::Prim(PrimType::I32);
+    //                 0x4, Ltr
+    //             ),
+    //         ].into(),
+    //         un_ops: [
+    //             (
+    //                 semantic_parser::UnOp { op: "!".to_owned(), op_pos: semantic_parser::UnOpPos::Pre, ty: Type::Prim(PrimType::I32) },
+    //                 semantic_parser::Type::Prim(PrimType::I32),
+    //             ),
+    //         ].into(),
+    //     }
+    // );
 
-    println!("env: {:#?}", sem_parser.global_env);
-    println!("funcs: {:#?}", sem_parser.funcs);
-    println!("errs: {:#?}", sem_parser.errs);
+    // println!("env: {:#?}", sem_parser.global_env);
+    // println!("funcs: {:#?}", sem_parser.funcs);
+    // println!("errs: {:#?}", sem_parser.errs);
 }

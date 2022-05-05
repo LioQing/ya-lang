@@ -32,7 +32,6 @@ pub enum Expr {
 
 impl Expr {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
-        // primary expression
         let mut expr = Self::parse_prim(lexer)?;
 
         loop {
@@ -41,8 +40,12 @@ impl Expr {
                     expr = Self::Call(CallExpr::parse(lexer, expr)?);
                 },
                 Ok(lexer::Token::Operator { .. }) => {
-                    match lexer.peek_nth_token(1) {
-                        Ok(t) if Self::is_expr(t) => {
+                    match lexer.peek_range_token(1..3).as_slice() {
+                        &[Ok(lexer::Token::Operator { .. }), Ok(lexer::Token::Operator { .. })] |
+                        &[Ok(lexer::Token::Bracket { kind: lexer::BracketKind::Close, .. }), ..] => {
+                            expr = Self::UnOp(UnOpExpr::parse_suf(lexer, expr)?);
+                        },
+                        &[Ok(t), ..] if Self::is_expr(t) => {
                             expr = Self::BinOp(BinOpExpr::parse(lexer, expr)?);
                         },
                         _ => {

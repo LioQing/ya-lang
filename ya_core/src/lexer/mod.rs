@@ -119,6 +119,22 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    pub fn peek_range_token(&mut self, r: std::ops::Range<usize>) -> Vec<Result<&Token, Error>> {
+        for _ in self.buf.len()..=r.end {
+            let res = self.to_token();
+            self.buf.push_back(res);
+        }
+
+        self.buf
+            .iter()
+            .skip(r.start)
+            .map(|t| t
+                .as_ref()
+                .map_err(|e| e.clone()))
+            .take(r.len())
+            .collect()
+    }
+
     pub fn next_token(&mut self) -> Result<Token, Error> {
         if let Some(token) = self.buf.pop_front() {
             token

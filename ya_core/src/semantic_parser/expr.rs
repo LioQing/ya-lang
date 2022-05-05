@@ -322,103 +322,50 @@ impl BinOpExpr {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     ) -> Expr {
-        let (lhs_bin_op_info, rhs_bin_op_info_prec) = {
-            let rhs_bin_expr = match &rhs.as_ref().kind {
-                ExprKind::BinOp(bin_expr) => bin_expr,
-                _ => unreachable!(),
+        let (lhs_op_info, rhs_op_info) =
+            if let Some(infos) = Self::flatten_op_info(envs, &mut errs, &op, &lhs, &rhs) {
+                infos
+            } else {
+                return Expr {
+                    ty: Type::Prim(PrimType::Unit),
+                    kind: ExprKind::BinOp(Self {
+                        op,
+                        lhs,
+                        rhs,
+                    }),
+                    errs,
+                };
             };
 
-            let lhs_bin_op = BinOp {
-                op: op.clone(),
-                lhs: lhs.ty.clone(),
-                rhs: rhs_bin_expr.lhs.ty.clone(),
-            };
-
-            let rhs_bin_op = BinOp {
-                op: rhs_bin_expr.op.clone(),
-                lhs: rhs_bin_expr.lhs.ty.clone(),
-                rhs: rhs_bin_expr.rhs.ty.clone(),
-            };
-
-            let (lhs_bin_op_info, rhs_bin_op_info) = match (
-                envs.get_bin_op(&lhs_bin_op),
-                envs.get_bin_op(&rhs_bin_op),
-            ) {
-                (Err(err1), Err(err2)) => {
-                    errs.push(err1);
-                    errs.push(err2);
-                    return Expr {
-                        ty: Type::Prim(PrimType::Unit),
-                        kind: ExprKind::BinOp(BinOpExpr {
-                            op,
-                            lhs,
-                            rhs,
-                        }),
-                        errs,
-                    };
-                },
-                (Err(err), _) | (_, Err(err)) => {
-                    errs.push(err);
-                    return Expr {
-                        ty: Type::Prim(PrimType::Unit),
-                        kind: ExprKind::BinOp(BinOpExpr {
-                            op,
-                            lhs,
-                            rhs,
-                        }),
-                        errs,
-                    };
-                },
-                (Ok(info1), Ok(info2)) => (info1, info2),
-            };
-
-            (lhs_bin_op_info, rhs_bin_op_info.prec)
-        };
-
-        if lhs_bin_op_info.prec < rhs_bin_op_info_prec {
+        // if lhs precedence less than rhs precedence, set lhs's rhs to rhs's lhs, and rhs's lhs to lhs
+        if lhs_op_info.prec < rhs_op_info.prec {
+            // break down rhs_op into smaller parts
             let BinOpExpr {
-                op: rhs_bin_expr_op,
-                lhs: rhs_bin_expr_lhs,
-                rhs: rhs_bin_expr_rhs
+                op: rhs_expr_op,
+                lhs: rhs_expr_lhs,
+                rhs: rhs_expr_rhs
             } = match rhs.kind {
                 ExprKind::BinOp(bin_expr) => bin_expr,
                 _ => unreachable!(),
             };
 
-            let lhs_bin_expr = Box::new(Expr {
-                ty: Self::get_bin_ty(envs, &mut errs, &op, &lhs, &rhs_bin_expr_lhs),
+            // create the new lhs
+            let new_lhs = Box::new(Expr {
+                ty: Self::get_ty(envs, &mut errs, &op, &lhs, &rhs_expr_lhs),
                 kind: ExprKind::BinOp(BinOpExpr {
                     op,
                     lhs,
-                    rhs: rhs_bin_expr_lhs,
+                    rhs: rhs_expr_lhs,
                 }),
                 errs,
             });
 
-            let mut rhs_bin_errs = vec![];
-            let ty = Self::get_bin_ty(envs, &mut rhs_bin_errs, &rhs_bin_expr_op, &lhs_bin_expr, &rhs_bin_expr_rhs);
+            let mut errs = vec![];
+            let ty = Self::get_ty(envs, &mut errs, &rhs_expr_op, &new_lhs, &rhs_expr_rhs);
 
-            Expr {
-                ty,
-                kind: ExprKind::BinOp(BinOpExpr {
-                    op: rhs_bin_expr_op,
-                    lhs: lhs_bin_expr,
-                    rhs: rhs_bin_expr_rhs,
-                }),
-                errs: rhs_bin_errs,
-            }
+            Self::new_expr(ty, rhs_expr_op, new_lhs, rhs_expr_rhs, errs)
         } else {
-            let ty = lhs_bin_op_info.ty;
-
-            Expr {
-                ty,
-                kind: ExprKind::BinOp(BinOpExpr {
-                    op,
-                    lhs,
-                    rhs,
-                }),
-                errs,
-            }
+            Self::new_expr(lhs_op_info.ty, op, lhs, rhs, errs)
         }
     }
 
@@ -429,18 +376,63 @@ impl BinOpExpr {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     ) -> Expr {
-        Expr {
-            ty: Self::get_bin_ty(envs, &mut errs, &op, &lhs, &rhs),
-            kind: ExprKind::BinOp(BinOpExpr {
-                op,
-                lhs,
-                rhs,
-            }),
-            errs,
-        }
+        Self::new_expr(
+            Self::get_ty(envs, &mut errs, &op, &lhs, &rhs),
+            op, lhs, rhs, errs,
+        )
     }
 
-    fn get_bin_ty(
+    ///     lhs_op            
+    ///     /    \               lhs_op   rhs_op
+    ///    /      \              /    \   /    \
+    ///  op1     rhs_op    =>   /      \ /      \
+    ///          /    \       op1      op2      op3
+    ///         /      \
+    ///       op2      op3     
+    fn flatten_op_info(
+        envs: &mut EnvStack,
+        errs: &mut Vec<Error>,
+        op: &String,
+        lhs: &Box<Expr>,
+        rhs: &Box<Expr>,
+    ) -> Option<(OpInfo, OpInfo)> {
+        let rhs_bin_expr = match &rhs.as_ref().kind {
+            ExprKind::BinOp(bin_expr) => bin_expr,
+            _ => unreachable!(),
+        };
+
+        let lhs_bin_op = BinOp {
+            op: op.clone(),
+            lhs: lhs.ty.clone(),
+            rhs: rhs_bin_expr.lhs.ty.clone(),
+        };
+
+        let rhs_bin_op = BinOp {
+            op: rhs_bin_expr.op.clone(),
+            lhs: rhs_bin_expr.lhs.ty.clone(),
+            rhs: rhs_bin_expr.rhs.ty.clone(),
+        };
+
+        let (lhs_bin_op_info, rhs_bin_op_info) = match (
+            envs.get_bin_op(&lhs_bin_op),
+            envs.get_bin_op(&rhs_bin_op),
+        ) {
+            (Err(err1), Err(err2)) => {
+                errs.push(err1);
+                errs.push(err2);
+                return None;
+            },
+            (Err(err), _) | (_, Err(err)) => {
+                errs.push(err);
+                return None;
+            },
+            (Ok(info1), Ok(info2)) => (info1, info2),
+        };
+
+        Some((lhs_bin_op_info, rhs_bin_op_info))
+    }
+
+    fn get_ty(
         envs: &mut EnvStack,
         errs: &mut Vec<Error>,
         op: &String,
@@ -456,6 +448,18 @@ impl BinOpExpr {
         envs.get_bin_op(&bin_op)
             .map_err(|err| errs.push(err))
             .map_or(Type::Prim(PrimType::Unit), |op| op.ty.clone())
+    }
+
+    fn new_expr(ty: Type, op: String, lhs: Box<Expr>, rhs: Box<Expr>, errs: Vec<Error>) -> Expr {
+        Expr {
+            ty,
+            kind: ExprKind::BinOp(BinOpExpr {
+                op,
+                lhs,
+                rhs,
+            }),
+            errs,
+        }
     }
 }
 
