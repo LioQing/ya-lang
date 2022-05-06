@@ -45,10 +45,10 @@ pub enum Error {
     BinOpNotFound { op: String, lhs: Type, rhs: Type },
 
     #[error("Prefix unary operator not found {op} {ty:?}")]
-    PrefixUnOpNotFound { op: String, ty: Type },
+    PrefixUnOpNotFound { op: char, ty: Type },
 
     #[error("Suffix unary operator not found {ty:?} {op}")]
-    SuffixUnOpNotFound { ty: Type, op: String },
+    SuffixUnOpNotFound { ty: Type, op: char },
 
     #[error("Undefined variable {var}")]
     UndefVar { var: String },

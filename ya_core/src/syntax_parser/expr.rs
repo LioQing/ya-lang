@@ -60,7 +60,7 @@ impl Expr {
                 Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
                 ..
             ] => {
-                let lhs_suf_expr = Expr::UnOp(UnOpExpr::parse_suf(lexer, expr)?);
+                let lhs_suf_expr = UnOpExpr::parse_suf(lexer, expr)?;
                 Ok(Expr::BinOp(BinOpExpr::parse(lexer, lhs_suf_expr)?))
             },
             &[ // 2 consecutive operators: $lhs$suf_un_op $bin_op $rhs || $lhs $bin_op $pre_un_op$rhs, else ambiguous
@@ -71,7 +71,7 @@ impl Expr {
             ] => match (span.dist_from_prev > 0, rhs_span.dist_from_prev > 0) {
                 (true, false) => Ok(Expr::BinOp(BinOpExpr::parse(lexer, expr)?)),
                 (false, true) => {
-                    let lhs_suf_expr = Expr::UnOp(UnOpExpr::parse_suf(lexer, expr)?);
+                    let lhs_suf_expr = UnOpExpr::parse_suf(lexer, expr)?;
                     Ok(Expr::BinOp(BinOpExpr::parse(lexer, lhs_suf_expr)?))
                 },
                 _ => Err(Error::AmbiguousOperators),
@@ -85,7 +85,7 @@ impl Expr {
                     ..
                 }),
                 ..
-            ] => Ok(Expr::UnOp(UnOpExpr::parse_suf(lexer, expr)?)),
+            ] => Ok(UnOpExpr::parse_suf(lexer, expr)?),
             &[ // 1 operator followed by other tokens: binary operator
                 Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
                 ..
@@ -284,12 +284,52 @@ pub enum UnOpPos {
 
 #[derive(Debug, PartialEq)]
 pub struct UnOpExpr {
-    pub op: token::Operator,
+    pub op: char,
     pub op_pos: UnOpPos,
     pub expr: Box<Expr>,
 }
 
 impl UnOpExpr {
+    pub fn pre_from_tokens(op: token::Operator, mut expr: Expr) -> Self {
+        if op.op.len() == 0 {
+            panic!("empty operator");
+        }
+
+        for op_char in op.op.chars().rev() {
+            expr = Expr::UnOp(Self {
+                op: op_char,
+                op_pos: UnOpPos::Pre,
+                expr: Box::new(expr),
+            });
+        }
+
+        if let Expr::UnOp(expr) = expr {
+            expr
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn suf_from_tokens(op: token::Operator, mut expr: Expr) -> Self {
+        if op.op.len() == 0 {
+            panic!("empty operator");
+        }
+
+        for op_char in op.op.chars() {
+            expr = Expr::UnOp(Self {
+                op: op_char,
+                op_pos: UnOpPos::Suf,
+                expr: Box::new(expr),
+            });
+        }
+
+        if let Expr::UnOp(expr) = expr {
+            expr
+        } else {
+            unreachable!()
+        }
+    }
+
     pub fn parse_pre(lexer: &mut lexer::Lexer) -> Result<Expr, Error> {
         let op = token::Operator::parse(lexer)?;
         let expr = Expr::parse(lexer)?;
@@ -298,32 +338,20 @@ impl UnOpExpr {
             Expr::BinOp(BinOpExpr { op: bin_op, lhs, rhs }) => {
                 Ok(Expr::BinOp(BinOpExpr {
                     op: bin_op,
-                    lhs: Box::new(Expr::UnOp(Self {
-                        op,
-                        op_pos: UnOpPos::Pre,
-                        expr: lhs,
-                    })),
+                    lhs: Box::new(Expr::UnOp(Self::pre_from_tokens(op, *lhs))),
                     rhs,
                 }))
             },
             _ => {
-                Ok(Expr::UnOp(Self {
-                    op,
-                    op_pos: UnOpPos::Pre,
-                    expr: Box::new(expr),
-                }))
+                Ok(Expr::UnOp(Self::pre_from_tokens(op, expr)))
             }
         }
     }
 
-    pub fn parse_suf(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, Error> {
+    pub fn parse_suf(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Expr, Error> {
         let op = token::Operator::parse(lexer)?;
 
-        Ok(Self {
-            op,
-            op_pos: UnOpPos::Suf,
-            expr: Box::new(expr),
-        })
+        Ok(Expr::UnOp(Self::suf_from_tokens(op, expr)))
     }
 }
 

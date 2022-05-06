@@ -254,3 +254,442 @@ fn tuple_and_unit() {
         }))
     }));
 }
+
+#[test]
+fn unary_operators() {
+    let parser = Parser::parse(r#"
+    let main = () {
+        &1- +- +2*;
+    
+        &1- + -+2*;
+    
+        &1-+ - +2*;
+    
+        &1 - +-+2*;
+    
+        &1-+- + 2*;
+    
+        &1 + 2*;
+        &1+ 2*;
+        &1 +2*;
+        &1+2*;
+    }
+    "#);
+    
+    assert_eq!(parser.items.len(), 1);
+    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
+        op: token::Operator { op: "=".to_owned() },
+        lhs: Box::new(Expr::Let(LetExpr {
+            var: token::VarName { name: "main".to_owned() },
+            ty: None,
+        })),
+        rhs: Box::new(Expr::Func(FuncExpr {
+            params: vec![],
+            ret_ty: token::TypeName::PrimType(PrimType::Unit),
+            body: Box::new(BlockExpr {
+                stmts: vec![
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "+-".to_owned()
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::UnOp(
+                                        UnOpExpr {
+                                            op: '-',
+                                            op_pos: UnOpPos::Suf,
+                                            expr: Box::new(Expr::Lit(
+                                                token::Lit {
+                                                    value: "1".to_owned(),
+                                                    prefix: "".to_owned(),
+                                                    suffix: "".to_owned(),
+                                                    kind: token::LitKind::Integer,
+                                                },
+                                            )),
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '+',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::UnOp(
+                                        UnOpExpr {
+                                            op: '*',
+                                            op_pos: UnOpPos::Suf,
+                                            expr: Box::new(Expr::Lit(
+                                                token::Lit {
+                                                    value: "2".to_owned(),
+                                                    prefix: "".to_owned(),
+                                                    suffix: "".to_owned(),
+                                                    kind: token::LitKind::Integer,
+                                                },
+                                            )),
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "+".to_owned()
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::UnOp(
+                                        UnOpExpr {
+                                            op: '-',
+                                            op_pos: UnOpPos::Suf,
+                                            expr: Box::new(Expr::Lit(
+                                                token::Lit {
+                                                    value: "1".to_owned(),
+                                                    prefix: "".to_owned(),
+                                                    suffix: "".to_owned(),
+                                                    kind: token::LitKind::Integer,
+                                                },
+                                            )),
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '-',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::UnOp(
+                                        UnOpExpr {
+                                            op: '+',
+                                            op_pos: UnOpPos::Pre,
+                                            expr: Box::new(Expr::UnOp(
+                                                UnOpExpr {
+                                                    op: '*',
+                                                    op_pos: UnOpPos::Suf,
+                                                    expr: Box::new(Expr::Lit(
+                                                        token::Lit {
+                                                            value: "2".to_owned(),
+                                                            prefix: "".to_owned(),
+                                                            suffix: "".to_owned(),
+                                                            kind: token::LitKind::Integer,
+                                                        },
+                                                    )),
+                                                },
+                                            )),
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "-".to_owned()
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::UnOp(
+                                        UnOpExpr {
+                                            op: '+',
+                                            op_pos: UnOpPos::Suf,
+                                            expr: Box::new(Expr::UnOp(
+                                                UnOpExpr {
+                                                    op: '-',
+                                                    op_pos: UnOpPos::Suf,
+                                                    expr: Box::new(Expr::Lit(
+                                                        token::Lit {
+                                                            value: "1".to_owned(),
+                                                            prefix: "".to_owned(),
+                                                            suffix: "".to_owned(),
+                                                            kind: token::LitKind::Integer,
+                                                        },
+                                                    )),
+                                                },
+                                            )),
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '+',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::UnOp(
+                                        UnOpExpr {
+                                            op: '*',
+                                            op_pos: UnOpPos::Suf,
+                                            expr: Box::new(Expr::Lit(
+                                                token::Lit {
+                                                    value: "2".to_owned(),
+                                                    prefix: "".to_owned(),
+                                                    suffix: "".to_owned(),
+                                                    kind: token::LitKind::Integer,
+                                                },
+                                            )),
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "-".to_owned()
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "1".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '+',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::UnOp(
+                                        UnOpExpr {
+                                            op: '-',
+                                            op_pos: UnOpPos::Pre,
+                                            expr: Box::new(Expr::UnOp(
+                                                UnOpExpr {
+                                                    op: '+',
+                                                    op_pos: UnOpPos::Pre,
+                                                    expr: Box::new(Expr::UnOp(
+                                                        UnOpExpr {
+                                                            op: '*',
+                                                            op_pos: UnOpPos::Suf,
+                                                            expr: Box::new(Expr::Lit(
+                                                                token::Lit {
+                                                                    value: "2".to_owned(),
+                                                                    prefix: "".to_owned(),
+                                                                    suffix: "".to_owned(),
+                                                                    kind: token::LitKind::Integer,
+                                                                },
+                                                            )),
+                                                        },
+                                                    )),
+                                                },
+                                            )),
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "+".to_owned()
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::UnOp(
+                                        UnOpExpr {
+                                            op: '-',
+                                            op_pos: UnOpPos::Suf,
+                                            expr: Box::new(Expr::UnOp(
+                                                UnOpExpr {
+                                                    op: '+',
+                                                    op_pos: UnOpPos::Suf,
+                                                    expr: Box::new(Expr::UnOp(
+                                                        UnOpExpr {
+                                                            op: '-',
+                                                            op_pos: UnOpPos::Suf,
+                                                            expr: Box::new(Expr::Lit(
+                                                                token::Lit {
+                                                                    value: "1".to_owned(),
+                                                                    prefix: "".to_owned(),
+                                                                    suffix: "".to_owned(),
+                                                                    kind: token::LitKind::Integer,
+                                                                },
+                                                            )),
+                                                        },
+                                                    )),
+                                                },
+                                            )),
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "2".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "+".to_owned()
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "1".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "2".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "+".to_owned(),
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "1".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "2".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "+".to_owned()
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "1".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "2".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                    Expr::BinOp(
+                        BinOpExpr {
+                            op: token::Operator {
+                                op: "+".to_owned()
+                            },
+                            lhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '&',
+                                    op_pos: UnOpPos::Pre,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "1".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                            rhs: Box::new(Expr::UnOp(
+                                UnOpExpr {
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
+                                    expr: Box::new(Expr::Lit(
+                                        token::Lit {
+                                            value: "2".to_owned(),
+                                            prefix: "".to_owned(),
+                                            suffix: "".to_owned(),
+                                            kind: token::LitKind::Integer,
+                                        },
+                                    )),
+                                },
+                            )),
+                        },
+                    ),
+                ],
+                expr: None,
+            }),
+        }))
+    }));
+}

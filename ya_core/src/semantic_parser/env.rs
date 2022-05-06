@@ -69,12 +69,12 @@ impl Env {
             .map(|op_info| op_info.clone())
             .ok_or(match un_op.op_pos {
                 UnOpPos::Pre => Error::PrefixUnOpNotFound {
-                    op: un_op.op.clone(),
+                    op: un_op.op,
                     ty: un_op.ty.clone(),
                 },
                 UnOpPos::Suf => Error::SuffixUnOpNotFound {
                     ty: un_op.ty.clone(),
-                    op: un_op.op.clone(),
+                    op: un_op.op,
                 },
             })
     }
@@ -153,12 +153,12 @@ impl EnvStack {
             })
             .ok_or(match un_op.op_pos {
                 UnOpPos::Pre => Error::PrefixUnOpNotFound {
-                    op: un_op.op.clone(),
+                    op: un_op.op,
                     ty: un_op.ty.clone(),
                 },
                 UnOpPos::Suf => Error::SuffixUnOpNotFound {
                     ty: un_op.ty.clone(),
-                    op: un_op.op.clone(),
+                    op: un_op.op,
                 },
             })
     }
@@ -270,7 +270,7 @@ pub enum UnOpPos {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct UnOp {
-    pub op: String,
+    pub op: char,
     pub op_pos: UnOpPos,
     pub ty: Type,
 }

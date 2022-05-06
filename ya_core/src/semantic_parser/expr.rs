@@ -505,7 +505,7 @@ impl From<syn::UnOpPos> for UnOpPos {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct UnOpExpr {
-    pub op: String,
+    pub op: char,
     pub op_pos: UnOpPos,
     pub expr: Box<Expr>,
 }
@@ -516,12 +516,12 @@ impl ParseSynExpr for UnOpExpr {
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let mut errs = vec![];
 
-        let op  = expr.op.op.clone();
+        let op  = expr.op;
         let op_pos: UnOpPos = expr.op_pos.into();
         let expr = Box::new(Expr::parse(envs, &*expr.expr));
 
         let ty = envs.get_un_op(&UnOp {
-            op: op.clone(),
+            op,
             op_pos: op_pos.clone(),
             ty: expr.ty.clone(),
         })
