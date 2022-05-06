@@ -53,6 +53,9 @@ pub enum Error {
     #[error("Expected parameter declaration in format of `[identifier]: [type]`, found {found:?}")]
     ExpectedParamDecl { found: (lexer::Token, lexer::Token, lexer::Token) },
 
+    #[error("Ambiguous operators")]
+    AmbiguousOperators,
+
     #[error("Unknown token {token:?} in global scope")]
     UnknownTokenInGlobalScope { token: lexer::Token },
 }

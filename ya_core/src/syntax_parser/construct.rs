@@ -2,14 +2,14 @@ use super::*;
 
 macro_rules! allow_empty_bracket {
     ($l:ident; $r:expr; $($b:expr),+) => {
-        if let Ok(lexer::Token::Bracket { raw, .. }) = $l.peek_token() {
+        if let Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw, .. }, .. }) = $l.peek_token() {
             if [$($b,)+].iter().any(|b| b.to_close_char() == *raw) {
                 return Ok($r);
             }
         }
     };
     ($l:ident; $r:expr; $($b:expr,)+) => {
-        if let Ok(lexer::Token::Bracket { raw, .. }) = $l.peek_token() {
+        if let Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw, .. }, .. }) = $l.peek_token() {
             if [$($b,)+].iter().any(|b| b.to_close_char() == *raw) {
                 return Ok($r);
             }
@@ -63,7 +63,7 @@ macro_rules! separated_helper {
     ($l:ident; $r:expr; allow_trailing @ $s:expr; $(stop @ $t:pat)?) => {
         let r = $r;
         match $l.peek_token()? {
-            lexer::Token::Separator { raw } if *raw == $s.into() => {
+            &lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } if raw == $s.into() => {
                 match $l.peek_nth_token(1)? {
                     $($t => {
                         $l.next_token().unwrap();
@@ -132,7 +132,7 @@ macro_rules! separated_parse {
     ($l:ident; $r:expr; $s:expr; allow_empty; allow_trailing; $($t:pat)?) => {
         loop {
             match $l.peek_token()? {
-                lexer::Token::Separator { raw } if *raw == $s.into() => {
+                lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into() => {
                     $l.next_token().unwrap();
                 },
                 $($t => {
@@ -154,14 +154,15 @@ macro_rules! separated_parse {
                 {
                     let r = $r;
                     
-                    if let lexer::Token::Separator { raw } = $l.peek_token()? {
-                        if *raw == $s.into() {
-                            while let lexer::Token::Separator { raw } = $l.peek_nth_token(1)? {
-                                if *raw == $s.into() {
-                                    $l.next_token().unwrap();
-                                } else {
-                                    break;
-                                }
+                    if matches!(
+                        $l.peek_token()?,
+                        lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into()
+                     ) {
+                        while let lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } = $l.peek_nth_token(1)? {
+                            if *raw == $s.into() {
+                                $l.next_token().unwrap();
+                            } else {
+                                break;
                             }
                         }
                     }
@@ -209,7 +210,7 @@ impl<T> Separated<T> {
             }
 
             match lexer.next_token()? {
-                lexer::Token::Separator { raw } if raw == sep.into() => {},
+                lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } if raw == sep.into() => {},
                 found => return Err(Error::ExpectedSeparator { expected: sep.into(), found }),
             }
         };

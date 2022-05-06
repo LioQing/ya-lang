@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use thiserror::Error;
+use std::ops::Range;
 
 #[cfg(test)]
 mod tests;
@@ -26,7 +27,21 @@ pub enum Error {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token {
+pub struct Span {
+    pub line: usize,
+    pub col_range: Range<usize>,
+    pub codepoint_range: Range<usize>,
+    pub dist_from_prev: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenKind {
     /** end of the source code */
     Eof,
 
@@ -49,6 +64,15 @@ pub enum Token {
     Identifier { raw: String },
 }
 
+impl TokenKind {
+    pub fn is_punc(&self) -> bool {
+        match self {
+            TokenKind::Separator { .. } | TokenKind::Operator { .. } => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum BracketKind {
     Open,
@@ -61,6 +85,42 @@ pub enum NumericKind {
     Float { dot_pos: Option<usize>, exp_pos: Option<usize> },
 }
 
+#[derive(Debug, Clone)]
+struct CodeIter<'a> {
+    peekable: std::iter::Peekable<std::str::Chars<'a>>,
+    counter: usize,
+}
+
+impl<'a> CodeIter<'a> {
+    fn new(code: &'a str) -> Self {
+        Self {
+            peekable: code.chars().peekable(),
+            counter: 0,
+        }
+    }
+
+    fn peek(&mut self) -> Option<&char> {
+        self.peekable.peek()
+    }
+
+    fn next(&mut self) -> Option<char> {
+        self.counter += 1;
+        self.peekable.next()
+    }
+
+    fn count(self) -> usize {
+        self.peekable.count()
+    }
+
+    fn take(self, n: usize) -> std::iter::Take<std::iter::Peekable<std::str::Chars<'a>>> {
+        self.peekable.take(n)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<char> {
+        self.peekable.nth(n)
+    }
+}
+
 /// The lexer.
 /// 
 /// Performs lexical analysis.
@@ -68,9 +128,12 @@ pub enum NumericKind {
 /// Provides methods to get and peek the next token.
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
-    curr: std::iter::Peekable<std::str::Chars<'a>>,
-    bracket_stack: Vec<char>,
+    curr: CodeIter<'a>,
+    curr_line: usize,
+    curr_col: usize,
+    curr_codepoint: usize,
 
+    bracket_stack: Vec<char>,
     buf: VecDeque<Result<Token, Error>>,
 }
 
@@ -84,9 +147,12 @@ impl<'a> Lexer<'a> {
 
     pub fn new(src: &'a str) -> Self {
         Self {
-            curr: src.chars().peekable(),
-            bracket_stack: vec![],
+            curr: CodeIter::new(src),
+            curr_line: 1,
+            curr_col: 0,
+            curr_codepoint: 0,
 
+            bracket_stack: vec![],
             buf: VecDeque::new(),
         }
     }
@@ -97,7 +163,7 @@ impl<'a> Lexer<'a> {
 
     pub fn peek_token(&mut self) -> Result<&Token, Error> {
         if self.buf.is_empty() {
-            let res = self.to_token();
+            let res = self.consume_next_token();
             self.buf.push_back(res);
         }
 
@@ -109,7 +175,7 @@ impl<'a> Lexer<'a> {
 
     pub fn peek_nth_token(&mut self, n: usize) -> Result<&Token, Error> {
         for _ in self.buf.len()..=n {
-            let res = self.to_token();
+            let res = self.consume_next_token();
             self.buf.push_back(res);
         }
 
@@ -121,7 +187,7 @@ impl<'a> Lexer<'a> {
 
     pub fn peek_range_token(&mut self, r: std::ops::Range<usize>) -> Vec<Result<&Token, Error>> {
         for _ in self.buf.len()..=r.end {
-            let res = self.to_token();
+            let res = self.consume_next_token();
             self.buf.push_back(res);
         }
 
@@ -139,31 +205,39 @@ impl<'a> Lexer<'a> {
         if let Some(token) = self.buf.pop_front() {
             token
         } else {
-            self.to_token()
+            self.consume_next_token()
         }
     }
 
-    pub fn curr_bracket_depth(&self) -> usize {
-        if let Some(Ok(Token::Bracket { depth, kind: BracketKind::Open, .. })) = self.buf.get(0) {
-            *depth
-        } else {
-            self.bracket_stack.len()
-        }
+    pub fn is_next_whitespace(&mut self) -> bool {
+        self.curr.peek().map_or(false, |c| c.is_ascii_whitespace())
     }
 
-    fn to_token(&mut self) -> Result<Token, Error> {
-        self.ignore_whitespaces();
+    fn consume_next_token(&mut self) -> Result<Token, Error> {
+        let dist_from_prev = self.ignore_whitespaces();
+        self.curr.counter = 0;
 
         let c = if let Some(c) = self.curr.next() {
             c
         } else {
-            return Ok(Token::Eof);
+            self.curr_col += 1;
+            self.curr_codepoint += 1;
+
+            return Ok(Token {
+                kind: TokenKind::Eof,
+                span: Span {
+                    line: self.curr_line,
+                    col_range: self.curr_col - 1..self.curr_col,
+                    codepoint_range: self.curr_codepoint - 1..self.curr_codepoint,
+                    dist_from_prev,
+                },
+            });
         };
 
-        match c {
+        let kind = match c {
             c if Self::OPEN_BRACKETS.contains(&c) => Ok(self.tokenize_open_bracket(c)),
             c if Self::CLOSE_BRACKETS.contains(&c) => self.tokenize_close_bracket(c),
-            c if Self::SEPARATORS.contains(&c) => Ok(Token::Separator { raw: c }),
+            c if Self::SEPARATORS.contains(&c) => Ok(TokenKind::Separator { raw: c }),
             '0'..='9' => self.tokenize_numeric(c),
             '.' => match self.curr.peek() {
                 Some(&c) if c.is_digit(10) => self.tokenize_numeric('.'),
@@ -173,19 +247,32 @@ impl<'a> Lexer<'a> {
             c if Self::is_operator_char(c) => Ok(self.tokenize_operator(c)),
             c if Self::is_identifier_char(c) => self.tokenize_identifier(c),
             c => Err(Error::UnknownSymbol { symbol: c.to_string() }),
-        }
+        };
+
+        self.curr_col += self.curr.counter;
+        self.curr_codepoint += self.curr.counter;
+
+        Ok(Token {
+            kind: kind?,
+            span: Span {
+                line: self.curr_line,
+                col_range: self.curr_col - self.curr.counter..self.curr_col,
+                codepoint_range: self.curr_codepoint - self.curr.counter..self.curr_codepoint,
+                dist_from_prev
+            },
+        })
     }
 
-    fn tokenize_open_bracket(&mut self, c: char) -> Token {
+    fn tokenize_open_bracket(&mut self, c: char) -> TokenKind {
         self.bracket_stack.push(c);
-        Token::Bracket { raw: c, depth: self.bracket_stack.len() - 1, kind: BracketKind::Open }
+        TokenKind::Bracket { raw: c, depth: self.bracket_stack.len() - 1, kind: BracketKind::Open }
     }
 
-    fn tokenize_close_bracket(&mut self, c: char) -> Result<Token, Error> {
+    fn tokenize_close_bracket(&mut self, c: char) -> Result<TokenKind, Error> {
         match self.bracket_stack.last() {
             Some(&last) if Self::match_close_bracket(c).unwrap() == last => {
                 self.bracket_stack.pop();
-                Ok(Token::Bracket { raw: c, depth: self.bracket_stack.len(), kind: BracketKind::Close })
+                Ok(TokenKind::Bracket { raw: c, depth: self.bracket_stack.len(), kind: BracketKind::Close })
             },
             Some(&last) => Err(Error::MismatchedBrackets {
                 expected: Self::match_open_bracket(last).unwrap(),
@@ -195,7 +282,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn tokenize_numeric(&mut self, first: char) ->Result<Token, Error> {
+    fn tokenize_numeric(&mut self, first: char) ->Result<TokenKind, Error> {
         let mut raw = String::new();
         let mut prefix = String::new();
         let mut suffix = String::new();
@@ -246,7 +333,7 @@ impl<'a> Lexer<'a> {
                         kind = NumericKind::Float { dot_pos: Some(raw.len()), exp_pos: None };
                         raw.push(c);
                     } else {
-                        return Ok(Token::Numeric { raw, prefix, suffix, kind });
+                        return Ok(TokenKind::Numeric { raw, prefix, suffix, kind });
                     }
                 },
                 'e' | 'E' => {
@@ -286,10 +373,10 @@ impl<'a> Lexer<'a> {
             self.curr.next();
         }
 
-        Ok(Token::Numeric { raw, prefix, suffix, kind })
+        Ok(TokenKind::Numeric { raw, prefix, suffix, kind })
     }
     
-    fn tokenize_string_char(&mut self, quote: char, prefix: String) -> Result<Token, Error> {
+    fn tokenize_string_char(&mut self, quote: char, prefix: String) -> Result<TokenKind, Error> {
         let mut raw = String::new();
         let mut suffix = String::new();
 
@@ -356,11 +443,11 @@ impl<'a> Lexer<'a> {
                 sequence
             })
         } else {
-            Ok(Token::StringChar { raw, prefix, suffix, quote })
+            Ok(TokenKind::StringChar { raw, prefix, suffix, quote })
         }
     }
 
-    fn tokenize_operator(&mut self, first: char) -> Token {
+    fn tokenize_operator(&mut self, first: char) -> TokenKind {
         let mut raw = first.to_string();
 
         while let Some(&c) = self.curr.peek() {
@@ -372,10 +459,10 @@ impl<'a> Lexer<'a> {
             self.curr.next();
         }
 
-        Token::Operator { raw }
+        TokenKind::Operator { raw }
     }
 
-    fn tokenize_identifier(&mut self, first: char) -> Result<Token, Error> {
+    fn tokenize_identifier(&mut self, first: char) -> Result<TokenKind, Error> {
         let mut raw = first.to_string();
 
         while let Some(&c) = self.curr.peek() {
@@ -390,16 +477,22 @@ impl<'a> Lexer<'a> {
             self.curr.next();
         }
 
-        Ok(Token::Identifier { raw })
+        Ok(TokenKind::Identifier { raw })
     }
 
-    fn ignore_whitespaces(&mut self) {
-        while let Some(&c) = self.curr.peek() {
-            if !c.is_ascii_whitespace() {
-                break;
+    fn ignore_whitespaces(&mut self) -> usize {
+        let mut count = 0;
+        while self.is_next_whitespace() {
+            if matches!(self.curr.next(), Some(c) if c == '\n') {
+                self.curr_line += 1;
+                self.curr_col = 0;
+            } else {
+                self.curr_col += 1;
             }
-            self.curr.next();
+            count += 1;
         }
+        self.curr_codepoint += count;
+        count
     }
 
     fn match_close_bracket(c: char) -> Option<char> {

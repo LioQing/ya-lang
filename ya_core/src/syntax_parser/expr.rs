@@ -34,66 +34,101 @@ impl Expr {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         let mut expr = Self::parse_prim(lexer)?;
 
-        loop {
+        let expr = loop {
             match lexer.peek_token() {
-                Ok(lexer::Token::Bracket { raw: '(', .. }) => {
+                Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: '(', .. }, .. }) => {
                     expr = Self::Call(CallExpr::parse(lexer, expr)?);
                 },
-                Ok(lexer::Token::Operator { .. }) => {
-                    match lexer.peek_range_token(1..3).as_slice() {
-                        &[Ok(lexer::Token::Operator { .. }), Ok(lexer::Token::Operator { .. })] |
-                        &[Ok(lexer::Token::Bracket { kind: lexer::BracketKind::Close, .. }), ..] => {
-                            expr = Self::UnOp(UnOpExpr::parse_suf(lexer, expr)?);
-                        },
-                        &[Ok(t), ..] if Self::is_expr(t) => {
-                            expr = Self::BinOp(BinOpExpr::parse(lexer, expr)?);
-                        },
-                        _ => {
-                            expr = Self::UnOp(UnOpExpr::parse_suf(lexer, expr)?);
-                        },
-                    }
-                },
-                Err(_) => break Err(lexer.next_token().err().unwrap().into()),
-                _ => break Ok(expr),
+                Err(_) => return Err(lexer.next_token().err().unwrap().into()),
+                _ => break expr,
             }
+        };
+        
+        // operators
+        match lexer.peek_range_token(0..4).as_slice() {
+            &[ // 4 consecutive operators: ambiguous
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+            ] => {
+                Err(Error::AmbiguousOperators)
+            },
+            &[ // 3 consecutive operators: $lhs $suf_un_op $bin_op $pre_un_op $rhs
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                ..
+            ] => {
+                let lhs_suf_expr = Expr::UnOp(UnOpExpr::parse_suf(lexer, expr)?);
+                Ok(Expr::BinOp(BinOpExpr::parse(lexer, lhs_suf_expr)?))
+            },
+            &[ // 2 consecutive operators: $lhs$suf_un_op $bin_op $rhs || $lhs $bin_op $pre_un_op$rhs, else ambiguous
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, span }),
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(lexer::Token { span: rhs_span, .. }),
+                ..
+            ] => match (span.dist_from_prev > 0, rhs_span.dist_from_prev > 0) {
+                (true, false) => Ok(Expr::BinOp(BinOpExpr::parse(lexer, expr)?)),
+                (false, true) => {
+                    let lhs_suf_expr = Expr::UnOp(UnOpExpr::parse_suf(lexer, expr)?);
+                    Ok(Expr::BinOp(BinOpExpr::parse(lexer, lhs_suf_expr)?))
+                },
+                _ => Err(Error::AmbiguousOperators),
+            },
+            &[ // 1 operator followed by a punctuation or closing bracket token: unary suffix operator
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(lexer::Token {
+                    kind: lexer::TokenKind::Operator { .. } |
+                    lexer::TokenKind::Separator { .. } |
+                    lexer::TokenKind::Bracket { kind: lexer::BracketKind::Close, .. },
+                    ..
+                }),
+                ..
+            ] => Ok(Expr::UnOp(UnOpExpr::parse_suf(lexer, expr)?)),
+            &[ // 1 operator followed by other tokens: binary operator
+                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                ..
+            ] => Ok(Expr::BinOp(BinOpExpr::parse(lexer, expr)?)),
+            _ => Ok(expr),
         }
     }
 
     pub fn parse_prim(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         match lexer.peek_token() {
-            Ok(lexer::Token::Identifier { raw }) if raw.as_str() == "let" => {
+            Ok(lexer::Token { kind: lexer::TokenKind::Identifier { raw }, .. }) if raw.as_str() == "let" => {
                 Ok(Self::Let(LetExpr::parse(lexer)?))
             },
-            Ok(lexer::Token::Numeric { .. }) |
-            Ok(lexer::Token::StringChar { .. }) => {
+            Ok(lexer::Token { kind: lexer::TokenKind::Numeric { .. }, .. }) |
+            Ok(lexer::Token { kind: lexer::TokenKind::StringChar { .. }, .. }) => {
                 Ok(Self::Lit(token::Lit::parse(lexer)?))
             },
-            Ok(lexer::Token::Identifier { .. }) => {
+            Ok(lexer::Token { kind: lexer::TokenKind::Identifier { .. }, .. }) => {
                 Ok(Self::VarName(token::VarName::parse(lexer)?))
             },
-            Ok(lexer::Token::Bracket { raw: '{', .. }) => {
+            Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: '{', .. }, .. }) => {
                 Ok(Self::Block(BlockExpr::parse(lexer)?))
             },
-            Ok(lexer::Token::Bracket { raw: '(', .. }) => {
+            Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: '(', .. }, .. }) => {
                 match (lexer.peek_nth_token(1).map(|t| t.clone()), lexer.peek_nth_token(2)) {
                     (
-                        Ok(lexer::Token::Bracket { raw: ')', .. }),
-                        Ok(lexer::Token::Bracket { raw: '{', .. })
+                        Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }),
+                        Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: '{', .. }, .. })
                     ) => {
                         Ok(Self::Func(FuncExpr::parse(lexer)?))
                     },
                     (
-                        Ok(lexer::Token::Bracket { raw: ')', .. }),
-                        Ok(lexer::Token::Operator { raw, .. })
+                        Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }),
+                        Ok(lexer::Token { kind: lexer::TokenKind::Operator { raw, .. }, .. })
                     ) if raw.as_str() == "->" => {
                         Ok(Self::Func(FuncExpr::parse(lexer)?))
                     },
-                    (Ok(lexer::Token::Bracket { raw: ')', .. }), _) => {
+                    (Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }), _) => {
                         Ok(Self::Tuple(TupleExpr::parse(lexer)?))
                     },
                     (
-                        Ok(lexer::Token::Identifier { .. }),
-                        Ok(lexer::Token::Operator { raw, .. })
+                        Ok(lexer::Token { kind: lexer::TokenKind::Identifier { .. }, .. }),
+                        Ok(lexer::Token { kind: lexer::TokenKind::Operator { raw, .. }, .. })
                     ) if raw.as_str() == ":" => {
                         Ok(Self::Func(FuncExpr::parse(lexer)?))
                     },
@@ -102,25 +137,12 @@ impl Expr {
                     },
                 }
             },
-            Ok(lexer::Token::Operator { .. }) => {
+            Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }) => {
                 Ok(UnOpExpr::parse_pre(lexer)?)
             },
             _ => {
                 Err(Error::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) })
             },
-        }
-    }
-
-    pub fn is_expr(token: &lexer::Token) -> bool {
-        match token {
-            &lexer::Token::Identifier { ref raw } if raw.as_str() == "let" => true,
-            &lexer::Token::Numeric { .. } |
-            &lexer::Token::StringChar { .. } |
-            &lexer::Token::Identifier { .. } |
-            &lexer::Token::Bracket { raw: '{', .. } |
-            &lexer::Token::Bracket { raw: '(', .. } |
-            &lexer::Token::Operator { .. } => true,
-            _ => false,
         }
     }
 }
@@ -147,7 +169,7 @@ impl BlockExpr {
                     token::Separator::Semicolon;
                     allow_empty;
                     allow_trailing;
-                    lexer::Token::Bracket { raw: '}', .. }
+                    lexer::Token { kind: lexer::TokenKind::Bracket { raw: '}', .. }, .. }
                 }
             })
         }?.inner;
@@ -186,7 +208,7 @@ impl TupleExpr {
                 Expr::parse(lexer)?;
                 token::Separator::Comma;
                 allow_trailing;
-                lexer::Token::Bracket { raw: ')', .. }
+                lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }
             }
         })?.inner.items;
 
@@ -206,7 +228,7 @@ impl LetExpr {
         let var = token::VarName::parse(lexer)?;
 
         let ty = match lexer.peek_token() {
-            Ok(lexer::Token::Operator { raw }) if raw.as_str() == ":" => {
+            Ok(lexer::Token { kind: lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == ":" => {
                 lexer.next_token()?;
                 Some(token::TypeName::parse(lexer)?)
             },
@@ -331,13 +353,13 @@ impl FuncExpr {
                 VarTypeDecl::parse(lexer)?;
                 token::Separator::Comma;
                 allow_trailing;
-                lexer::Token::Bracket { raw: ')', .. }
+                lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }
             }
         })?.inner.items;
 
         // return type
         let ret_ty = match lexer.peek_token() {
-            Ok(lexer::Token::Operator { raw }) if raw.as_str() == "->" => {
+            Ok(lexer::Token { kind: lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == "->" => {
                 token::Operator::parse_with(lexer, &["->"]).unwrap();
                 token::TypeName::parse(lexer)?
             },

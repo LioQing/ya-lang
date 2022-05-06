@@ -9,7 +9,8 @@ pub enum Keyword {
 impl Keyword {
     pub fn parse(lexer: &mut lexer::Lexer, keywords: &[&str]) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::Identifier { raw } if keywords.contains(&raw.as_str()) => Ok(Self::from_str(raw.as_str())?),
+            lexer::Token { kind: lexer::TokenKind::Identifier { raw }, .. }
+                if keywords.contains(&raw.as_str()) => Ok(Self::from_str(raw.as_str())?),
             found => Err(Error::ExpectedKeyword {
                 expected: keywords.iter().map(|s| s.to_string()).collect(),
                 found,
@@ -26,7 +27,7 @@ pub struct VarName {
 impl VarName {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::Identifier { raw } => Ok(Self { name: raw }),
+            lexer::Token { kind: lexer::TokenKind::Identifier { raw }, .. } => Ok(Self { name: raw }),
             found => return Err(Error::ExpectedIdentifier { found }),
         }
     }
@@ -42,7 +43,7 @@ pub enum TypeName {
 impl TypeName {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         match lexer.peek_token()? {
-            lexer::Token::Bracket { raw: '(', .. } => {
+            lexer::Token { kind: lexer::TokenKind::Bracket { raw: '(', .. }, .. } => {
                 let tys = Bracketed::parse(lexer, &[Bracket::Round], |lexer| {
                     allow_empty_bracket! {
                         lexer;
@@ -55,7 +56,7 @@ impl TypeName {
                         Self::parse(lexer)?;
                         token::Separator::Comma;
                         allow_trailing;
-                        lexer::Token::Bracket { raw: ')', .. }
+                        lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }
                     }
                 })?.inner.items;
 
@@ -64,8 +65,11 @@ impl TypeName {
                     [..] => Ok(Self::Tuple(tys)),
                 }
             }
-            lexer::Token::Identifier { .. } => {
-                if let lexer::Token::Identifier { raw } = lexer.next_token().unwrap() {
+            lexer::Token { kind: lexer::TokenKind::Identifier { .. }, .. } => {
+                if let lexer::Token {
+                    kind: lexer::TokenKind::Identifier { raw },
+                    ..
+                } = lexer.next_token().unwrap() {
                     Ok(Self::from_str(raw.as_str()).unwrap())
                 } else {
                     unreachable!()
@@ -96,14 +100,15 @@ pub struct Operator {
 impl Operator {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::Operator { raw } => Ok(Self { op: raw }),
-            found => return Err(Error::ExpectedOperator { expected: vec!["any".to_owned()], found }),
+            lexer::Token { kind: lexer::TokenKind::Operator { raw }, .. } => Ok(Self { op: raw }),
+            found => return Err(Error::ExpectedOperator { expected: vec!["[any operator]".to_owned()], found }),
         }
     }
 
     pub fn parse_with(lexer: &mut lexer::Lexer, ops: &[&str]) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::Operator { raw } if ops.contains(&raw.as_str()) => Ok(Self { op: raw }),
+            lexer::Token { kind: lexer::TokenKind::Operator { raw }, .. }
+                if ops.contains(&raw.as_str()) => Ok(Self { op: raw }),
             found => Err(Error::ExpectedOperator {
                 expected: ops.iter().map(|s| s.to_string()).collect(),
                 found,
@@ -161,9 +166,12 @@ impl Bracket {
 
     pub fn parse_open(lexer: &mut lexer::Lexer, brackets: &[Self]) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::Bracket {
-                raw,
-                kind: lexer::BracketKind::Open,
+            lexer::Token {
+                kind: lexer::TokenKind::Bracket {
+                    raw,
+                    kind: lexer::BracketKind::Open,
+                    ..
+                },
                 ..
             } if brackets.contains(&Self::from_open_char(raw)) => {
                 Ok(Self::from_open_char(raw))
@@ -180,9 +188,12 @@ impl Bracket {
 
     pub fn parse_close(lexer: &mut lexer::Lexer, brackets: &[Bracket]) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::Bracket {
-                raw,
-                kind: lexer::BracketKind::Close,
+            lexer::Token { kind:
+                lexer::TokenKind::Bracket {
+                    raw,
+                    kind: lexer::BracketKind::Close,
+                    ..
+                },
                 ..
             } if brackets.contains(&Self::from_close_char(raw)) => {
                 Ok(Self::from_close_char(raw))
@@ -203,10 +214,13 @@ impl Bracket {
         depth: usize
     ) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::Bracket {
-                raw,
-                depth: d,
-                kind: lexer::BracketKind::Open,
+            lexer::Token { kind:
+                lexer::TokenKind::Bracket {
+                    raw,
+                    depth: d,
+                    kind: lexer::BracketKind::Open,
+                },
+                ..
             } if brackets.contains(&Self::from_open_char(raw)) && d == depth => {
                 Ok(Self::from_open_char(raw))
             },
@@ -226,10 +240,13 @@ impl Bracket {
         depth: usize
     ) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::Bracket {
-                raw,
-                depth: d,
-                kind: lexer::BracketKind::Close,
+            lexer::Token { kind:
+                lexer::TokenKind::Bracket {
+                    raw,
+                    depth: d,
+                    kind: lexer::BracketKind::Close,
+                },
+                ..
             } if brackets.contains(&Self::from_close_char(raw)) && d == depth => {
                 Ok(Self::from_close_char(raw))
             },
@@ -288,16 +305,40 @@ pub struct Lit {
 impl Lit {
     pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
         match lexer.next_token()? {
-            lexer::Token::StringChar { raw, prefix, suffix, quote: '"' } => {
+            lexer::Token {
+                kind: lexer::TokenKind::StringChar {
+                    raw, prefix, suffix,
+                    quote: '"'
+                },
+                ..
+            } => {
                 Ok(Self { value: raw, prefix, suffix, kind: LitKind::String })
             },
-            lexer::Token::StringChar { raw, prefix, suffix, quote: '\'' } => {
+            lexer::Token {
+                kind: lexer::TokenKind::StringChar {
+                    raw, prefix, suffix,
+                    quote: '\''
+                },
+                ..
+            } => {
                 Ok(Self { value: raw, prefix, suffix, kind: LitKind::Char })
             },
-            lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Integer } => {
+            lexer::Token {
+                kind: lexer::TokenKind::Numeric {
+                    raw, prefix, suffix,
+                    kind: lexer::NumericKind::Integer
+                },
+                ..
+            } => {
                 Ok(Self { value: raw, prefix, suffix, kind: LitKind::Integer })
             },
-            lexer::Token::Numeric { raw, prefix, suffix, kind: lexer::NumericKind::Float { .. }} => {
+            lexer::Token {
+                kind: lexer::TokenKind::Numeric {
+                    raw, prefix, suffix,
+                    kind: lexer::NumericKind::Float { .. }
+                },
+                ..
+            } => {
                 Ok(Self { value: raw, prefix, suffix, kind: LitKind::Float })
             },
             found => Err(Error::ExpectedLiteral { found }),

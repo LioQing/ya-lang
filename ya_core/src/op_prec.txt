@@ -1,5 +1,5 @@
 // lower number is higher priority
-/* 0 LTR */ "." // not overloadable
+/* 0 LTR */ "."
 /* 1 LTR */ 
 /* 2 RTL */ 
 /* 3 RTL */ 
@@ -14,4 +14,7 @@
 /* c LTR */ "&&"
 /* d LTR */ "||"
 /* e RTL */ 
-/* f RTL */ "=" // not overloadable
+/* f RTL */ "="
+
+// overloadable operators: !@#$%^&*=`?~\|/+-<>
+// the single character operator "=" is not overloadable
