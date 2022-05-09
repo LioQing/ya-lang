@@ -80,9 +80,10 @@ impl Env {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct EnvStack {
     pub envs: Vec<Env>,
+    pub funcs: Vec<Expr>,
 }
 
 impl EnvStack {

@@ -10,15 +10,23 @@ fn empty_func() {
         un_ops: HashMap::new(),
     });
 
-    assert_eq!(sem_parser.global_env, Env {
-        tys: HashMap::new(),
-        vars: [
-            ("main".to_owned(), Some(Type::Func(FuncType {
-                params: vec![],
-                ret_ty: Box::new(Type::Prim(PrimType::Unit)),
-            })))
-        ].into(),
-        bin_ops: HashMap::new(),
-        un_ops: HashMap::new(),
+    assert_eq!(sem_parser.global_env, EnvStack {
+        envs: vec![Env {
+            tys: HashMap::new(),
+            vars: [
+                ("main".to_owned(), Some(Type::Func(FuncType {
+                    params: vec![],
+                    ret_ty: Box::new(Type::Prim(PrimType::Unit)),
+                })))
+            ].into(),
+            bin_ops: HashMap::new(),
+            un_ops: HashMap::new(),
+        }],
+        funcs: vec![Expr {
+            ty: Type::Prim(PrimType::Unit),
+            kind: ExprKind::Block(BlockExpr { stmts: vec![], expr: None }),
+            errs: vec![],
+            env: Some(Env { tys: HashMap::new(), vars: HashMap::new(), bin_ops: HashMap::new(), un_ops: HashMap::new() }),
+        }],
     });
 }

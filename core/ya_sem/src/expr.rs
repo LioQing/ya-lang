@@ -18,9 +18,9 @@ pub trait ParseSynExpr where Self: Sized {
             un_ops: HashMap::new(),
         });
 
-        let expr = Self::parse(envs, expr);
+        let mut expr = Self::parse(envs, expr);
 
-        envs.envs.pop();
+        expr.env = envs.envs.pop();
 
         expr
     }
@@ -31,9 +31,23 @@ pub struct Expr {
     pub ty: Type,
     pub kind: ExprKind,
     pub errs: Vec<Error>,
+    pub env: Option<Env>,
 }
 
 impl Expr {
+    pub fn new(ty: Type, kind: ExprKind, errs: Vec<Error>) -> Self {
+        Self {
+            ty,
+            kind,
+            errs,
+            env: None,
+        }
+    }
+
+    pub fn new_ok(ty: Type, kind: ExprKind) -> Self {
+        Self::new(ty, kind, vec![])
+    }
+
     pub fn get_ty_from_syn(envs: &EnvStack, expr: &ya_syn::Expr) -> Result<Type, Error> {
         match expr {
             ya_syn::Expr::Lit(lit) => Ok(Type::from_lit(lit)?),
@@ -57,7 +71,7 @@ impl ParseSynExpr for Expr {
             ya_syn::Expr::Call(expr) => CallExpr::parse(envs, expr),
             ya_syn::Expr::BinOp(expr) => BinOpExpr::parse(envs, expr),
             ya_syn::Expr::UnOp(expr) => UnOpExpr::parse(envs, expr),
-            _ => unimplemented!(),
+            ya_syn::Expr::Func(expr) => FuncExpr::parse(envs, expr),
         }
     }
 }
@@ -93,13 +107,13 @@ impl ParseSynExpr for LetExpr {
             .expect("No environment found").vars
             .insert(var.clone(), None);
 
-        Expr {
-            ty: Type::Prim(PrimType::Unit),
-            kind: ExprKind::Let(Self {
+        Expr::new(
+            Type::Prim(PrimType::Unit),
+            ExprKind::Let(Self {
                 var,
             }),
             errs
-        }
+        )
     }
 }
 
@@ -142,16 +156,16 @@ impl LitExpr {
             },
         };
 
-        Expr {
+        Expr::new(
             ty,
-            kind: ExprKind::Lit(Self {
+            ExprKind::Lit(Self {
                 value: expr.value.clone(),
                 prefix: expr.prefix.clone(),
                 suffix: expr.suffix.clone(),
                 kind: (&expr.kind).into(),
             }),
             errs,
-        }
+        )
     }
 }
 
@@ -178,13 +192,13 @@ impl ParseSynExpr for VarExpr {
             .map_err(|err| errs.push(err))
             .map_or(Type::Prim(PrimType::Unit), |ty| ty.clone());
 
-        Expr {
+        Expr::new(
             ty,
-            kind: ExprKind::Var(Self {
+            ExprKind::Var(Self {
                 name: expr.name.clone(),
             }),
             errs,
-        }
+        )
     }
 }
 
@@ -211,14 +225,13 @@ impl ParseSynExpr for BlockExpr {
             .as_ref()
             .map_or(Type::Prim(PrimType::Unit), |expr| expr.ty.clone());
 
-        Expr {
+        Expr::new_ok(
             ty,
-            kind: ExprKind::Block(Self {
+            ExprKind::Block(Self {
                 stmts,
                 expr,
             }),
-            errs: vec![],
-        }
+        )
     }
 }
 
@@ -243,13 +256,13 @@ impl ParseSynExpr for TupleExpr {
             .map(|item| item.ty.clone())
             .collect());
 
-        Expr {
+        Expr::new(
             ty,
-            kind: ExprKind::Tuple(Self {
+            ExprKind::Tuple(Self {
                 items,
             }),
             errs,
-        }
+        )
     }
 }
 
@@ -302,14 +315,14 @@ impl ParseSynExpr for CallExpr {
             found => { errs.push(Error::ExpectedCallable { found: found.clone() }); },
         };
 
-        Expr {
-            ty: callee.ty.clone(),
-            kind: ExprKind::Call(CallExpr {
+        Expr::new(
+            callee.ty.clone(),
+            ExprKind::Call(CallExpr {
                 callee,
                 args
             }),
             errs,
-        }
+        )
     }
 }
 
@@ -361,7 +374,36 @@ impl ParseSynExpr for BinOpExpr {
             let mut idx = 0;
             loop {
                 let mut errs = vec![];
-                let push_flat_info = |envs: &mut EnvStack, operands: &Vec<Option<Expr>>| {
+                let push_flat_info = |envs: &mut EnvStack, operands: &mut Vec<Option<Expr>>| {
+                    // special case: $let_expr = $rhs
+                    // initialize the var in $let_expr with $rhs
+                    match (&mut operands[idx..idx + 2], curr_op.op.op.as_str()) {
+                        ([Some(lhs @ Expr { kind: ExprKind::Let(_), .. }), Some(rhs)], "=") => {
+                            lhs.ty = rhs.ty.clone();
+
+                            if let ExprKind::Let(ref mut let_expr) = lhs.kind {
+                                *envs.envs
+                                    .last_mut()
+                                    .unwrap()
+                                    .vars
+                                    .iter_mut()
+                                    .find(|(name, _)| **name == let_expr.var)
+                                    .expect("Cannot find variable in env for the $let_expr = $rhs")
+                                    .1 = Some(rhs.ty.clone());
+                            }
+
+                            op_flat_infos.push(OpFlatInfo {
+                                info: OpInfo::new(Type::Prim(PrimType::Unit), 0xf),
+                                op: curr_op.op.op.clone(),
+                                errs,
+                                lhs: idx,
+                                rhs: idx + 1,
+                            });
+                            return;
+                        },
+                        _ => {},
+                    }
+                    
                     op_flat_infos.push(OpFlatInfo {
                         info: Self::get_op_info(
                             envs,
@@ -380,14 +422,14 @@ impl ParseSynExpr for BinOpExpr {
                 match &*curr_op.rhs {
                     ya_syn::Expr::BinOp(bin_expr) => {
                         operands.push(Some(Expr::parse(envs, &*bin_expr.lhs)));
-                        push_flat_info(envs, &operands);
+                        push_flat_info(envs, &mut operands);
 
                         curr_op = bin_expr;
                         idx += 1;
                     },
                     _ => {
                         operands.push(Some(Expr::parse(envs, &*curr_op.rhs)));
-                        push_flat_info(envs, &operands);
+                        push_flat_info(envs, &mut operands);
                         break;
                     },
                 }
@@ -407,15 +449,15 @@ impl ParseSynExpr for BinOpExpr {
                     rhs,
                 } = op_flat_infos.pop().unwrap();
 
-                return Expr {
+                return Expr::new(
                     ty,
-                    kind: ExprKind::BinOp(BinOpExpr {
+                    ExprKind::BinOp(BinOpExpr {
                         op,
                         lhs: Box::new(std::mem::replace(&mut operands[lhs], None).unwrap()),
                         rhs: Box::new(std::mem::replace(&mut operands[rhs], None).unwrap()),
                     }),
                     errs,
-                };
+                );
             }
 
             let root = op_flat_infos
@@ -449,15 +491,15 @@ impl ParseSynExpr for BinOpExpr {
                 false => resolve_prec(envs, lhs_vec, operands),
             };
 
-            Expr {
-                ty: BinOpExpr::get_op_info(envs, &mut root.errs, &root.op, &lhs, &rhs).ty.clone(),
-                kind: ExprKind::BinOp(BinOpExpr {
+            Expr::new(
+                BinOpExpr::get_op_info(envs, &mut root.errs, &root.op, &lhs, &rhs).ty.clone(),
+                ExprKind::BinOp(BinOpExpr {
                     op: root.op,
                     lhs: Box::new(lhs),
                     rhs: Box::new(rhs),
                 }),
-                errs: root.errs,
-            }
+                root.errs,
+            )
         }
 
         resolve_prec(envs, op_flat_infos, &mut operands)
@@ -495,15 +537,15 @@ impl ParseSynExpr for UnOpExpr {
         .map_err(|err| errs.push(err))
         .map_or(Type::Prim(PrimType::Unit), |ty| ty.clone());
 
-        Expr {
+        Expr::new(
             ty,
-            kind: ExprKind::UnOp(UnOpExpr {
+            ExprKind::UnOp(UnOpExpr {
                 op,
                 op_pos,
                 expr,
             }),
             errs,
-        }
+        )
     }
 }
 
@@ -512,19 +554,25 @@ pub struct FuncExpr {
     pub id: usize,
 }
 
-// impl ParseSynExpr for FuncExpr {
-//     type SynExpr = ya_syn::FuncExpr;
+impl ParseSynExpr for FuncExpr {
+    type SynExpr = ya_syn::FuncExpr;
 
-//     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
-//         let mut errs = vec![];
-//         let ty = Type::Func(expr.into());
+    fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+        let ty = Type::Func(expr.into());
 
-//         Expr {
-//             ty,
-//             kind: ExprKind::Func(FuncExpr {
-//                 id: 0,
-//             }),
-//             errs,
-//         }
-//     }
-// }
+        let vars = expr.params
+            .iter()
+            .map(|param| (param.name.name.clone(), Some((&param.ty).into())))
+            .collect::<HashMap<_, _>>();
+        
+        let func = BlockExpr::parse_with_local_vars(envs, expr.body.as_ref(), vars);
+        envs.funcs.push(func);
+
+        Expr::new_ok(
+            ty,
+            ExprKind::Func(FuncExpr {
+                id: envs.funcs.len() - 1,
+            }),
+        )
+    }
+}

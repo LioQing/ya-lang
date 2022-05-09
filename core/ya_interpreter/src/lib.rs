@@ -51,9 +51,6 @@ pub fn run() {
 
     let syn_parser = ya_syn::Parser::parse(&src);
 
-    println!("{:#?}", syn_parser.items);
-    println!("{:#?}", syn_parser.errs);
-
     let sem_parser = ya_sem::Parser::parse(
         &syn_parser.items,
         ya_sem::Env {
@@ -65,6 +62,5 @@ pub fn run() {
     );
 
     println!("env: {:#?}", sem_parser.global_env);
-    println!("funcs: {:#?}", sem_parser.funcs);
     println!("errs: {:#?}", sem_parser.errs);
 }

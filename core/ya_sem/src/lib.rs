@@ -59,8 +59,7 @@ pub enum Error {
 /// Performs semantic analysis.
 /// Parse the parse tree into an AST.
 pub struct Parser {
-    pub global_env: Env,
-    pub funcs: Vec<Expr>,
+    pub global_env: EnvStack,
     pub errs: Vec<Error>,
 }
 
@@ -68,6 +67,7 @@ impl Parser {
     pub fn parse(syn_items: &Vec<ya_syn::Item>, env: Env) -> Self {
         let mut global = EnvStack {
             envs: vec![env],
+            funcs: vec![],
         };
         let mut errs = vec![];
 
@@ -110,7 +110,13 @@ impl Parser {
 
                     // add function to be parsed later
                     if let (Some(Type::Func(_)), ya_syn::Expr::Func(func)) = (&ty, expr.rhs.as_ref()) {
-                        funcs.push(func.body.as_ref());
+                        funcs.push((
+                            func.params
+                                .iter()
+                                .map(|param| (param.name.name.clone(), Some((&param.ty).into())))
+                                .collect::<HashMap<_, _>>(),
+                            func.body.as_ref(),
+                        ));
                     }
 
                     global.envs.first_mut().unwrap().vars.insert(name, ty);
@@ -121,13 +127,16 @@ impl Parser {
 
         // second scan: function body codes
         let funcs = funcs
-            .iter()
-            .map(|expr| BlockExpr::parse(&mut global, expr))
-            .collect();
+            .into_iter()
+            .map(|(vars, expr)| {
+                BlockExpr::parse_with_local_vars(&mut global, expr, vars)
+            })
+            .collect::<Vec<_>>();
+        
+        global.funcs.extend(funcs);
 
         Self {
-            global_env: global.envs.pop().unwrap(),
-            funcs,
+            global_env: global,
             errs,
         }
     }

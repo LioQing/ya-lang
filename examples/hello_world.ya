@@ -1,5 +1,5 @@
-let println = (s: char[9]) {}
-
 let main = () {
-    println("Hello, world!");
+    let main2 = () -> i32 {
+        1 + 1
+    }
 }
