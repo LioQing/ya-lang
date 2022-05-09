@@ -315,130 +315,13 @@ pub struct BinOpExpr {
 }
 
 impl BinOpExpr {
-    fn parse_recur(
-        envs: &mut EnvStack,
-        mut errs: Vec<Error>,
-        op: String,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    ) -> Expr {
-        let (lhs_op_info, rhs_op_info) =
-            if let Some(infos) = Self::flatten_op_info(envs, &mut errs, &op, &lhs, &rhs) {
-                infos
-            } else {
-                return Expr {
-                    ty: Type::Prim(PrimType::Unit),
-                    kind: ExprKind::BinOp(Self {
-                        op,
-                        lhs,
-                        rhs,
-                    }),
-                    errs,
-                };
-            };
-
-        // if lhs precedence less than rhs precedence, set lhs's rhs to rhs's lhs, and rhs's lhs to lhs
-        if lhs_op_info.prec < rhs_op_info.prec {
-            // break down rhs_op into smaller parts
-            let BinOpExpr {
-                op: rhs_expr_op,
-                lhs: rhs_expr_lhs,
-                rhs: rhs_expr_rhs
-            } = match rhs.kind {
-                ExprKind::BinOp(bin_expr) => bin_expr,
-                _ => unreachable!(),
-            };
-
-            // create the new lhs
-            let new_lhs = Box::new(Expr {
-                ty: Self::get_ty(envs, &mut errs, &op, &lhs, &rhs_expr_lhs),
-                kind: ExprKind::BinOp(BinOpExpr {
-                    op,
-                    lhs,
-                    rhs: rhs_expr_lhs,
-                }),
-                errs,
-            });
-
-            let mut errs = vec![];
-            let ty = Self::get_ty(envs, &mut errs, &rhs_expr_op, &new_lhs, &rhs_expr_rhs);
-
-            Self::new_expr(ty, rhs_expr_op, new_lhs, rhs_expr_rhs, errs)
-        } else {
-            Self::new_expr(lhs_op_info.ty, op, lhs, rhs, errs)
-        }
-    }
-
-    fn parse_base(
-        envs: &mut EnvStack,
-        mut errs: Vec<Error>,
-        op: String,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    ) -> Expr {
-        Self::new_expr(
-            Self::get_ty(envs, &mut errs, &op, &lhs, &rhs),
-            op, lhs, rhs, errs,
-        )
-    }
-
-    ///     lhs_op            
-    ///     /    \               lhs_op   rhs_op
-    ///    /      \              /    \   /    \
-    ///  op1     rhs_op    =>   /      \ /      \
-    ///          /    \       op1      op2      op3
-    ///         /      \
-    ///       op2      op3     
-    fn flatten_op_info(
+    fn get_op_info(
         envs: &mut EnvStack,
         errs: &mut Vec<Error>,
         op: &String,
-        lhs: &Box<Expr>,
-        rhs: &Box<Expr>,
-    ) -> Option<(OpInfo, OpInfo)> {
-        let rhs_bin_expr = match &rhs.as_ref().kind {
-            ExprKind::BinOp(bin_expr) => bin_expr,
-            _ => unreachable!(),
-        };
-
-        let lhs_bin_op = BinOp {
-            op: op.clone(),
-            lhs: lhs.ty.clone(),
-            rhs: rhs_bin_expr.lhs.ty.clone(),
-        };
-
-        let rhs_bin_op = BinOp {
-            op: rhs_bin_expr.op.clone(),
-            lhs: rhs_bin_expr.lhs.ty.clone(),
-            rhs: rhs_bin_expr.rhs.ty.clone(),
-        };
-
-        let (lhs_bin_op_info, rhs_bin_op_info) = match (
-            envs.get_bin_op(&lhs_bin_op),
-            envs.get_bin_op(&rhs_bin_op),
-        ) {
-            (Err(err1), Err(err2)) => {
-                errs.push(err1);
-                errs.push(err2);
-                return None;
-            },
-            (Err(err), _) | (_, Err(err)) => {
-                errs.push(err);
-                return None;
-            },
-            (Ok(info1), Ok(info2)) => (info1, info2),
-        };
-
-        Some((lhs_bin_op_info, rhs_bin_op_info))
-    }
-
-    fn get_ty(
-        envs: &mut EnvStack,
-        errs: &mut Vec<Error>,
-        op: &String,
-        lhs: &Box<Expr>,
-        rhs: &Box<Expr>,
-    ) -> Type {
+        lhs: &Expr,
+        rhs: &Expr,
+    ) -> OpInfo {
         let bin_op = BinOp {
             op: op.clone(),
             lhs: lhs.ty.clone(),
@@ -447,19 +330,7 @@ impl BinOpExpr {
 
         envs.get_bin_op(&bin_op)
             .map_err(|err| errs.push(err))
-            .map_or(Type::Prim(PrimType::Unit), |op| op.ty.clone())
-    }
-
-    fn new_expr(ty: Type, op: String, lhs: Box<Expr>, rhs: Box<Expr>, errs: Vec<Error>) -> Expr {
-        Expr {
-            ty,
-            kind: ExprKind::BinOp(BinOpExpr {
-                op,
-                lhs,
-                rhs,
-            }),
-            errs,
-        }
+            .unwrap_or(OpInfo::new(Type::Prim(PrimType::Unit), 0))
     }
 }
 
@@ -467,33 +338,123 @@ impl ParseSynExpr for BinOpExpr {
     type SynExpr = syn::BinOpExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
-        let errs = vec![];
-
-        let op = expr.op.op.clone();
-        let mut lhs = Box::new(Expr::parse(envs, &*expr.lhs));
-        let rhs = Box::new(Expr::parse(envs, &*expr.rhs));
-
-        // special case: let expression on lhs
-        match (op.as_str(), &mut *lhs) {
-            ("=", ref mut expr) => {
-                if let ExprKind::Let(ref mut let_expr) = &mut expr.kind {
-                    let let_ty = envs.get_var_mut(let_expr.var.as_str())
-                        .expect("let expression did not push to environment stack");
-
-                    *let_ty = Some(rhs.ty.clone());
-                }
-
-                expr.ty = rhs.ty.clone();
-            },
-            _ => {},
-        };
-
-        match &*rhs {
-            Expr { kind: ExprKind::BinOp(_), .. } => {
-                Self::parse_recur(envs, errs, op, lhs, rhs)
-            },
-            _ => Self::parse_base(envs, errs, op, lhs, rhs),
+        struct OpFlatInfo {
+            info: OpInfo,
+            op: String,
+            errs: Vec<Error>,
+            lhs: usize,
+            rhs: usize,
         }
+
+        let mut op_flat_infos = vec![];
+        let mut operands = vec![Some(Expr::parse(envs, &*expr.lhs))];
+        // push all flattened operations information into op_flat_infos
+        // push all operands into operands
+        {
+            let mut curr_op = expr;
+            let mut idx = 0;
+            loop {
+                let mut errs = vec![];
+                let push_flat_info = |envs: &mut EnvStack, operands: &Vec<Option<Expr>>| {
+                    op_flat_infos.push(OpFlatInfo {
+                        info: Self::get_op_info(
+                            envs,
+                            &mut errs,
+                            &curr_op.op.op,
+                            operands[idx].as_ref().unwrap(),
+                            operands[idx + 1].as_ref().unwrap(),
+                        ),
+                        op: curr_op.op.op.clone(),
+                        errs,
+                        lhs: idx,
+                        rhs: idx + 1,
+                    });
+                };
+
+                match &*curr_op.rhs {
+                    syn::Expr::BinOp(bin_expr) => {
+                        operands.push(Some(Expr::parse(envs, &*bin_expr.lhs)));
+                        push_flat_info(envs, &operands);
+
+                        curr_op = bin_expr;
+                        idx += 1;
+                    },
+                    _ => {
+                        operands.push(Some(Expr::parse(envs, &*curr_op.rhs)));
+                        push_flat_info(envs, &operands);
+                        break;
+                    },
+                }
+            }
+        }
+
+        fn resolve_prec(envs: &mut EnvStack, mut op_flat_infos: Vec<OpFlatInfo>, operands: &mut Vec<Option<Expr>>) -> Expr {
+            if op_flat_infos.len() == 1 {
+                let OpFlatInfo { 
+                    info: OpInfo {
+                        ty,
+                        ..
+                    },
+                    op,
+                    errs,
+                    lhs,
+                    rhs,
+                } = op_flat_infos.pop().unwrap();
+
+                return Expr {
+                    ty,
+                    kind: ExprKind::BinOp(BinOpExpr {
+                        op,
+                        lhs: Box::new(std::mem::replace(&mut operands[lhs], None).unwrap()),
+                        rhs: Box::new(std::mem::replace(&mut operands[rhs], None).unwrap()),
+                    }),
+                    errs,
+                };
+            }
+
+            let root = op_flat_infos
+                .iter()
+                .enumerate()
+                .rev()
+                .max_by(|(_, a), (_, b)| a.info.prec.cmp(&b.info.prec))
+                .unwrap();
+            
+            let root = if root.1.info.assoc == OpAssoc::Right {
+                op_flat_infos
+                    .iter()
+                    .enumerate()
+                    .max_by(|(_, a), (_, b)| a.info.prec.cmp(&b.info.prec))
+                    .map(|(idx, _)| idx)
+                    .unwrap()
+            } else {
+                root.0
+            };
+
+            let rhs_vec = op_flat_infos.split_off(root + 1);
+            let mut lhs_vec = op_flat_infos;
+            let mut root = lhs_vec.pop().unwrap();
+
+            let rhs = match rhs_vec.is_empty() {
+                true => std::mem::replace(&mut operands[root.rhs], None).unwrap(),
+                false => resolve_prec(envs, rhs_vec, operands),
+            };
+            let lhs = match lhs_vec.is_empty() {
+                true => std::mem::replace(&mut operands[root.lhs], None).unwrap(),
+                false => resolve_prec(envs, lhs_vec, operands),
+            };
+
+            Expr {
+                ty: BinOpExpr::get_op_info(envs, &mut root.errs, &root.op, &lhs, &rhs).ty.clone(),
+                kind: ExprKind::BinOp(BinOpExpr {
+                    op: root.op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                }),
+                errs: root.errs,
+            }
+        }
+
+        resolve_prec(envs, op_flat_infos, &mut operands)
     }
 }
 
@@ -550,7 +511,6 @@ pub struct FuncExpr {
 //     type SynExpr = syn::FuncExpr;
 
 //     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
-
 //         Expr {
 //             ty,
 //             kind: ExprKind::Func(FuncExpr {

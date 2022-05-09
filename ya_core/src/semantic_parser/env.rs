@@ -41,7 +41,7 @@ impl Env {
             // special case: "=" operator
             "=" => match bin_op.lhs.eq(&bin_op.rhs) {
                 true => {
-                    Ok(OpInfo { prec: 0xf, ty: bin_op.lhs.clone(), assoc: OpAssoc::Ltr })
+                    Ok(OpInfo::new(bin_op.lhs.clone(), 0x0))
                 },
                 false => {
                     Err(Error::AssignmentMismatchedOperandTypes {
@@ -247,13 +247,31 @@ impl From<&syn::FuncExpr> for FuncType {
 macro_rules! bin_op_info {
     ($lhs:expr, $op:literal, $rhs:expr => $res:expr; $prec:literal, $assoc:ident) => {
         (
-            BinOp { op: $op.to_owned(), lhs: $lhs, rhs: $rhs },
-            OpInfo { ty: $res, prec: $prec, assoc: OpAssoc::$assoc },
+            semantic_parser::BinOp { op: $op.to_owned(), lhs: $lhs, rhs: $rhs },
+            semantic_parser::OpInfo::new($res, $prec),
         )
     };
 }
 
 pub(super) use bin_op_info;
+
+#[allow(unused_macros)]
+macro_rules! un_op_info {
+    ($op:literal, $ty:expr => $res:expr) => {
+        (
+            semantic_parser::UnOp { op: $op, op_pos: semantic_parser::UnOpPos::Pre, ty: $ty },
+            $res,
+        )
+    };
+    ($ty:expr, $op:literal => $res:expr) => {
+        (
+            semantic_parser::UnOp { op: $op, op_pos: semantic_parser::UnOpPos::Suf, ty: $ty },
+            $res,
+        )
+    };
+}
+
+pub(super) use un_op_info;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BinOp {
@@ -279,8 +297,8 @@ pub type OpPrec = u8;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum OpAssoc {
-    Ltr,
-    Rtl,
+    Left,
+    Right,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -288,4 +306,16 @@ pub struct OpInfo {
     pub ty: Type,
     pub prec: OpPrec,
     pub assoc: OpAssoc,
+    pub func_id: Option<usize>,
+}
+
+impl OpInfo {
+    pub fn new(ty: Type, prec: OpPrec) -> Self {
+        Self {
+            ty,
+            prec,
+            assoc: [OpAssoc::Left, OpAssoc::Right][(prec as usize / 2) % 2],
+            func_id: None,
+        }
+    }
 }
