@@ -2,13 +2,14 @@ extern crate ya_core;
 use std::collections::HashMap;
 
 use ya_core::*;
-use ya_core::semantic_parser::Type;
+use ya_core::ya_sem::Type;
+use ya_core::ya_prim_types::PrimType;
 
 macro_rules! bin_op_info {
     ($lhs:expr, $op:literal, $rhs:expr => $res:expr; $prec:literal) => {
         (
-            semantic_parser::BinOp { op: $op.to_owned(), lhs: $lhs, rhs: $rhs },
-            semantic_parser::OpInfo::new($res, $prec),
+            ya_sem::BinOp { op: $op.to_owned(), lhs: $lhs, rhs: $rhs },
+            ya_sem::OpInfo::new($res, $prec),
         )
     };
 }
@@ -16,13 +17,13 @@ macro_rules! bin_op_info {
 macro_rules! un_op_info {
     ($op:literal, $ty:expr => $res:expr) => {
         (
-            semantic_parser::UnOp { op: $op, op_pos: semantic_parser::UnOpPos::Pre, ty: $ty },
+            ya_sem::UnOp { op: $op, op_pos: ya_sem::UnOpPos::Pre, ty: $ty },
             $res,
         )
     };
     ($ty:expr, $op:literal => $res:expr) => {
         (
-            semantic_parser::UnOp { op: $op, op_pos: semantic_parser::UnOpPos::Suf, ty: $ty },
+            ya_sem::UnOp { op: $op, op_pos: ya_sem::UnOpPos::Suf, ty: $ty },
             $res,
         )
     };
@@ -47,16 +48,16 @@ fn main() {
         un_op_info!('-', Type::Prim(PrimType::I32) => Type::Prim(PrimType::I32)),
     ].into();
 
-    let src = std::fs::read_to_string("ya_core/examples/hello_world.ya").unwrap();
+    let src = std::fs::read_to_string("core/examples/hello_world.ya").unwrap();
 
-    let syn_parser = syntax_parser::Parser::parse(&src);
+    let syn_parser = ya_syn::Parser::parse(&src);
 
     println!("{:#?}", syn_parser.items);
     println!("{:#?}", syn_parser.errs);
 
-    let sem_parser = semantic_parser::Parser::parse(
+    let sem_parser = ya_sem::Parser::parse(
         &syn_parser.items,
-        semantic_parser::Env {
+        ya_sem::Env {
             tys: HashMap::new(),
             vars: HashMap::new(),
             bin_ops,

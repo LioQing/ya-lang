@@ -1,5 +1,5 @@
-use crate::lexer;
-use crate::prim_type::PrimType;
+use ya_lexer;
+use ya_prim_types::PrimType;
 use thiserror::Error;
 use std::str::FromStr;
 
@@ -18,7 +18,7 @@ pub use item::*;
 #[derive(Error, Debug, PartialEq)]
 pub enum Error {
     #[error("{0}")]
-    Lexer(#[from] lexer::Error),
+    Lexer(#[from] ya_lexer::Error),
 
     #[error("Enum parse error: {0}")]
     StrumEnumParse(#[from] strum::ParseError),
@@ -30,34 +30,34 @@ pub enum Error {
     ExpectedPrimExpr { found: String },
 
     #[error("Expected identifier, found {found:?}")]
-    ExpectedIdentifier { found: lexer::Token },
+    ExpectedIdentifier { found: ya_lexer::Token },
 
     #[error("Expected keyword: {expected:?}, found {found:?}")]
-    ExpectedKeyword { expected: Vec<String>, found: lexer::Token },
+    ExpectedKeyword { expected: Vec<String>, found: ya_lexer::Token },
 
     #[error("Expected symbol: {expected:?}, found {found:?}")]
-    ExpectedSymbol { expected: Vec<String>, found: lexer::Token },
+    ExpectedSymbol { expected: Vec<String>, found: ya_lexer::Token },
 
     #[error("Expected bracket: {expected:?}, found {found:?}")]
-    ExpectedBracket { expected: Vec<char>, found: lexer::Token },
+    ExpectedBracket { expected: Vec<char>, found: ya_lexer::Token },
 
     #[error("Expected separator: {expected}, found {found:?}")]
-    ExpectedSeparator { expected: char, found: lexer::Token },
+    ExpectedSeparator { expected: char, found: ya_lexer::Token },
 
     #[error("Expected operator: {expected:?}, found {found:?}")]
-    ExpectedOperator { expected: Vec<String>, found: lexer::Token },
+    ExpectedOperator { expected: Vec<String>, found: ya_lexer::Token },
 
     #[error("Expected literal, found {found:?}")]
-    ExpectedLiteral { found: lexer::Token },
+    ExpectedLiteral { found: ya_lexer::Token },
 
     #[error("Expected parameter declaration in format of `[identifier]: [type]`, found {found:?}")]
-    ExpectedParamDecl { found: (lexer::Token, lexer::Token, lexer::Token) },
+    ExpectedParamDecl { found: (ya_lexer::Token, ya_lexer::Token, ya_lexer::Token) },
 
     #[error("Ambiguous operators")]
     AmbiguousOperators,
 
     #[error("Unknown token {token:?} in global scope")]
-    UnknownTokenInGlobalScope { token: lexer::Token },
+    UnknownTokenInGlobalScope { token: ya_lexer::Token },
 }
 
 /// The syntax parser.
@@ -71,7 +71,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn parse(src: &str) -> Self {
-        let mut lexer = lexer::Lexer::new(src);
+        let mut lexer = ya_lexer::Lexer::new(src);
         let mut items = vec![];
         let mut errs = vec![];
 

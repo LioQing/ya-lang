@@ -110,9 +110,10 @@ checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
 name = "ya_core"
 version = "0.1.0"
 dependencies = [
- "itertools",
- "strum",
- "thiserror",
+ "ya_lexer",
+ "ya_prim_types",
+ "ya_sem",
+ "ya_syn",
 ]
 
 [[package]]
@@ -120,4 +121,40 @@ name = "ya_lang"
 version = "0.1.0"
 dependencies = [
  "ya_core",
+]
+
+[[package]]
+name = "ya_lexer"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "ya_prim_types"
+version = "0.1.0"
+dependencies = [
+ "strum",
+]
+
+[[package]]
+name = "ya_sem"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "strum",
+ "thiserror",
+ "ya_prim_types",
+ "ya_syn",
+]
+
+[[package]]
+name = "ya_syn"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "strum",
+ "thiserror",
+ "ya_lexer",
+ "ya_prim_types",
 ]

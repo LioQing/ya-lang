@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn empty_func() {
-    let syn_parser = syn::Parser::parse("let main = () {}");
+    let syn_parser = ya_syn::Parser::parse("let main = () {}");
     let sem_parser = Parser::parse(&syn_parser.items, Env {
         tys: HashMap::new(),
         vars: HashMap::new(),

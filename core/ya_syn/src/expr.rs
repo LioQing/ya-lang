@@ -31,12 +31,12 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+    pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         let mut expr = Self::parse_prim(lexer)?;
 
         let expr = loop {
             match lexer.peek_token() {
-                Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: '(', .. }, .. }) => {
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '(', .. }, .. }) => {
                     expr = Self::Call(CallExpr::parse(lexer, expr)?);
                 },
                 Err(_) => return Err(lexer.next_token().err().unwrap().into()),
@@ -47,26 +47,26 @@ impl Expr {
         // operators
         match lexer.peek_range_token(0..4).as_slice() {
             &[ // 4 consecutive operators: ambiguous
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
             ] => {
                 Err(Error::AmbiguousOperators)
             },
             &[ // 3 consecutive operators: $lhs $suf_un_op $bin_op $pre_un_op $rhs
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
                 ..
             ] => {
                 let lhs_suf_expr = UnOpExpr::parse_suf(lexer, expr)?;
                 Ok(Expr::BinOp(BinOpExpr::parse(lexer, lhs_suf_expr)?))
             },
             &[ // 2 consecutive operators: $lhs$suf_un_op $bin_op $rhs || $lhs $bin_op $pre_un_op$rhs, else ambiguous
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, span }),
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
-                Ok(lexer::Token { span: rhs_span, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, span }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { span: rhs_span, .. }),
                 ..
             ] => match (span.dist_from_prev > 0, rhs_span.dist_from_prev > 0) {
                 (true, false) => Ok(Expr::BinOp(BinOpExpr::parse(lexer, expr)?)),
@@ -77,58 +77,58 @@ impl Expr {
                 _ => Err(Error::AmbiguousOperators),
             },
             &[ // 1 operator followed by a punctuation or closing bracket token: unary suffix operator
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
-                Ok(lexer::Token {
-                    kind: lexer::TokenKind::Operator { .. } |
-                    lexer::TokenKind::Separator { .. } |
-                    lexer::TokenKind::Bracket { kind: lexer::BracketKind::Close, .. },
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token {
+                    kind: ya_lexer::TokenKind::Operator { .. } |
+                    ya_lexer::TokenKind::Separator { .. } |
+                    ya_lexer::TokenKind::Bracket { kind: ya_lexer::BracketKind::Close, .. },
                     ..
                 }),
                 ..
             ] => Ok(UnOpExpr::parse_suf(lexer, expr)?),
             &[ // 1 operator followed by other tokens: binary operator
-                Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }),
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }),
                 ..
             ] => Ok(Expr::BinOp(BinOpExpr::parse(lexer, expr)?)),
             _ => Ok(expr),
         }
     }
 
-    pub fn parse_prim(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+    pub fn parse_prim(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         match lexer.peek_token() {
-            Ok(lexer::Token { kind: lexer::TokenKind::Identifier { raw }, .. }) if raw.as_str() == "let" => {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { raw }, .. }) if raw.as_str() == "let" => {
                 Ok(Self::Let(LetExpr::parse(lexer)?))
             },
-            Ok(lexer::Token { kind: lexer::TokenKind::Numeric { .. }, .. }) |
-            Ok(lexer::Token { kind: lexer::TokenKind::StringChar { .. }, .. }) => {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Numeric { .. }, .. }) |
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::StringChar { .. }, .. }) => {
                 Ok(Self::Lit(token::Lit::parse(lexer)?))
             },
-            Ok(lexer::Token { kind: lexer::TokenKind::Identifier { .. }, .. }) => {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { .. }, .. }) => {
                 Ok(Self::VarName(token::VarName::parse(lexer)?))
             },
-            Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: '{', .. }, .. }) => {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '{', .. }, .. }) => {
                 Ok(Self::Block(BlockExpr::parse(lexer)?))
             },
-            Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: '(', .. }, .. }) => {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '(', .. }, .. }) => {
                 match (lexer.peek_nth_token(1).map(|t| t.clone()), lexer.peek_nth_token(2)) {
                     (
-                        Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }),
-                        Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: '{', .. }, .. })
+                        Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: ')', .. }, .. }),
+                        Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '{', .. }, .. })
                     ) => {
                         Ok(Self::Func(FuncExpr::parse(lexer)?))
                     },
                     (
-                        Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }),
-                        Ok(lexer::Token { kind: lexer::TokenKind::Operator { raw, .. }, .. })
+                        Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: ')', .. }, .. }),
+                        Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { raw, .. }, .. })
                     ) if raw.as_str() == "->" => {
                         Ok(Self::Func(FuncExpr::parse(lexer)?))
                     },
-                    (Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }), _) => {
+                    (Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: ')', .. }, .. }), _) => {
                         Ok(Self::Tuple(TupleExpr::parse(lexer)?))
                     },
                     (
-                        Ok(lexer::Token { kind: lexer::TokenKind::Identifier { .. }, .. }),
-                        Ok(lexer::Token { kind: lexer::TokenKind::Operator { raw, .. }, .. })
+                        Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { .. }, .. }),
+                        Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { raw, .. }, .. })
                     ) if raw.as_str() == ":" => {
                         Ok(Self::Func(FuncExpr::parse(lexer)?))
                     },
@@ -137,7 +137,7 @@ impl Expr {
                     },
                 }
             },
-            Ok(lexer::Token { kind: lexer::TokenKind::Operator { .. }, .. }) => {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { .. }, .. }) => {
                 Ok(UnOpExpr::parse_pre(lexer)?)
             },
             _ => {
@@ -154,7 +154,7 @@ pub struct BlockExpr {
 }
 
 impl BlockExpr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+    pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         let mut seps = {
             Bracketed::parse(lexer, &[token::Bracket::Curly], |lexer| {
                 allow_empty_bracket! {
@@ -169,7 +169,7 @@ impl BlockExpr {
                     token::Separator::Semicolon;
                     allow_empty;
                     allow_trailing;
-                    lexer::Token { kind: lexer::TokenKind::Bracket { raw: '}', .. }, .. }
+                    ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '}', .. }, .. }
                 }
             })
         }?.inner;
@@ -195,7 +195,7 @@ pub struct TupleExpr {
 }
 
 impl TupleExpr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+    pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         let items = Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
             allow_empty_bracket! {
                 lexer;
@@ -208,7 +208,7 @@ impl TupleExpr {
                 Expr::parse(lexer)?;
                 token::Separator::Comma;
                 allow_trailing;
-                lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }
+                ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: ')', .. }, .. }
             }
         })?.inner.items;
 
@@ -223,12 +223,12 @@ pub struct LetExpr {
 }
 
 impl LetExpr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+    pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         token::Keyword::parse(lexer, &["let"])?;
         let var = token::VarName::parse(lexer)?;
 
         let ty = match lexer.peek_token() {
-            Ok(lexer::Token { kind: lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == ":" => {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == ":" => {
                 lexer.next_token()?;
                 Some(token::TypeName::parse(lexer)?)
             },
@@ -246,7 +246,7 @@ pub struct CallExpr {
 }
 
 impl CallExpr {
-    pub fn parse(lexer: &mut lexer::Lexer, caller: Expr) -> Result<Self, Error> {
+    pub fn parse(lexer: &mut ya_lexer::Lexer, caller: Expr) -> Result<Self, Error> {
         let args = TupleExpr::parse(lexer)?.items;
 
         Ok(Self {
@@ -264,7 +264,7 @@ pub struct BinOpExpr {
 }
 
 impl BinOpExpr {
-    pub fn parse(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Self, Error> {
+    pub fn parse(lexer: &mut ya_lexer::Lexer, expr: Expr) -> Result<Self, Error> {
         let op = token::Operator::parse(lexer)?;
         let rhs = Expr::parse(lexer)?;
 
@@ -330,7 +330,7 @@ impl UnOpExpr {
         }
     }
 
-    pub fn parse_pre(lexer: &mut lexer::Lexer) -> Result<Expr, Error> {
+    pub fn parse_pre(lexer: &mut ya_lexer::Lexer) -> Result<Expr, Error> {
         let op = token::Operator::parse(lexer)?;
         let expr = Expr::parse(lexer)?;
 
@@ -348,7 +348,7 @@ impl UnOpExpr {
         }
     }
 
-    pub fn parse_suf(lexer: &mut lexer::Lexer, expr: Expr) -> Result<Expr, Error> {
+    pub fn parse_suf(lexer: &mut ya_lexer::Lexer, expr: Expr) -> Result<Expr, Error> {
         let op = token::Operator::parse(lexer)?;
 
         Ok(Expr::UnOp(Self::suf_from_tokens(op, expr)))
@@ -363,7 +363,7 @@ pub struct FuncExpr {
 }
 
 impl FuncExpr {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+    pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         // params
         let params = Bracketed::parse(lexer, &[token::Bracket::Round], |lexer| {
             allow_empty_bracket! {
@@ -381,13 +381,13 @@ impl FuncExpr {
                 VarTypeDecl::parse(lexer)?;
                 token::Separator::Comma;
                 allow_trailing;
-                lexer::Token { kind: lexer::TokenKind::Bracket { raw: ')', .. }, .. }
+                ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: ')', .. }, .. }
             }
         })?.inner.items;
 
         // return type
         let ret_ty = match lexer.peek_token() {
-            Ok(lexer::Token { kind: lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == "->" => {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == "->" => {
                 token::Operator::parse_with(lexer, &["->"]).unwrap();
                 token::TypeName::parse(lexer)?
             },

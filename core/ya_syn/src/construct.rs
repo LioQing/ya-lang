@@ -2,14 +2,14 @@ use super::*;
 
 macro_rules! allow_empty_bracket {
     ($l:ident; $r:expr; $($b:expr),+) => {
-        if let Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw, .. }, .. }) = $l.peek_token() {
+        if let Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw, .. }, .. }) = $l.peek_token() {
             if [$($b,)+].iter().any(|b| b.to_close_char() == *raw) {
                 return Ok($r);
             }
         }
     };
     ($l:ident; $r:expr; $($b:expr,)+) => {
-        if let Ok(lexer::Token { kind: lexer::TokenKind::Bracket { raw, .. }, .. }) = $l.peek_token() {
+        if let Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw, .. }, .. }) = $l.peek_token() {
             if [$($b,)+].iter().any(|b| b.to_close_char() == *raw) {
                 return Ok($r);
             }
@@ -26,9 +26,9 @@ pub struct Bracketed<T> {
 }
 
 impl<T> Bracketed<T> {
-    pub fn parse<F>(lexer: &mut lexer::Lexer, brackets: &[token::Bracket], f: F) -> Result<Self, Error>
+    pub fn parse<F>(lexer: &mut ya_lexer::Lexer, brackets: &[token::Bracket], f: F) -> Result<Self, Error>
     where
-        F: Fn(&mut lexer::Lexer) -> Result<T, Error>
+        F: Fn(&mut ya_lexer::Lexer) -> Result<T, Error>
     {
         let bracket = token::Bracket::parse_open(lexer, brackets)?;
 
@@ -63,7 +63,7 @@ macro_rules! separated_helper {
     ($l:ident; $r:expr; allow_trailing @ $s:expr; $(stop @ $t:pat)?) => {
         let r = $r;
         match $l.peek_token()? {
-            &lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } if raw == $s.into() => {
+            &ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } if raw == $s.into() => {
                 match $l.peek_nth_token(1)? {
                     $($t => {
                         $l.next_token().unwrap();
@@ -132,7 +132,7 @@ macro_rules! separated_parse {
     ($l:ident; $r:expr; $s:expr; allow_empty; allow_trailing; $($t:pat)?) => {
         loop {
             match $l.peek_token()? {
-                lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into() => {
+                ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into() => {
                     $l.next_token().unwrap();
                 },
                 $($t => {
@@ -156,9 +156,9 @@ macro_rules! separated_parse {
                     
                     if matches!(
                         $l.peek_token()?,
-                        lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into()
+                        ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into()
                      ) {
-                        while let lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } = $l.peek_nth_token(1)? {
+                        while let ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } = $l.peek_nth_token(1)? {
                             if *raw == $s.into() {
                                 $l.next_token().unwrap();
                             } else {
@@ -194,9 +194,9 @@ impl<T> Separated<T> {
         }
     }
 
-    pub fn parse<F>(lexer: &mut lexer::Lexer, sep: token::Separator, parse: F) -> Result<Self, Error>
+    pub fn parse<F>(lexer: &mut ya_lexer::Lexer, sep: token::Separator, parse: F) -> Result<Self, Error>
     where
-        F: Fn(&mut lexer::Lexer) -> Result<SepRes<T>, Error>
+        F: Fn(&mut ya_lexer::Lexer) -> Result<SepRes<T>, Error>
     {
         let mut items = Vec::new();
 
@@ -210,7 +210,7 @@ impl<T> Separated<T> {
             }
 
             match lexer.next_token()? {
-                lexer::Token { kind: lexer::TokenKind::Separator { raw }, .. } if raw == sep.into() => {},
+                ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } if raw == sep.into() => {},
                 found => return Err(Error::ExpectedSeparator { expected: sep.into(), found }),
             }
         };
@@ -230,7 +230,7 @@ pub struct VarTypeDecl {
 }
 
 impl VarTypeDecl {
-    pub fn parse(lexer: &mut lexer::Lexer) -> Result<Self, Error> {
+    pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         let name = token::VarName::parse(lexer)?;
         token::Operator::parse_with(lexer, &[":"])?;
         let ty = token::TypeName::parse(lexer)?;

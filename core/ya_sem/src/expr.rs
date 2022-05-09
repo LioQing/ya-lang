@@ -34,29 +34,29 @@ pub struct Expr {
 }
 
 impl Expr {
-    pub fn get_ty_from_syn(envs: &EnvStack, expr: &syn::Expr) -> Result<Type, Error> {
+    pub fn get_ty_from_syn(envs: &EnvStack, expr: &ya_syn::Expr) -> Result<Type, Error> {
         match expr {
-            syn::Expr::Lit(lit) => Ok(Type::Prim(<Result<PrimType, Error>>::from(lit)?)),
-            syn::Expr::Func(func) => Ok(Type::Func(func.into())),
-            syn::Expr::VarName(name) => Ok(envs.get_def_var(name.name.as_str())?.clone()),
+            ya_syn::Expr::Lit(lit) => Ok(Type::Prim(Type::prim_type_from(lit)?)),
+            ya_syn::Expr::Func(func) => Ok(Type::Func(func.into())),
+            ya_syn::Expr::VarName(name) => Ok(envs.get_def_var(name.name.as_str())?.clone()),
             _ => Ok(Type::Prim(PrimType::Unit)),
         }
     }
 }
 
 impl ParseSynExpr for Expr {
-    type SynExpr = syn::Expr;
+    type SynExpr = ya_syn::Expr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         match expr {
-            syn::Expr::Let(expr) => LetExpr::parse(envs, expr),
-            syn::Expr::Lit(expr) => LitExpr::parse(envs, expr),
-            syn::Expr::VarName(expr) => VarExpr::parse(envs, expr),
-            syn::Expr::Block(expr) => BlockExpr::parse(envs, expr),
-            syn::Expr::Tuple(expr) => TupleExpr::parse(envs, expr),
-            syn::Expr::Call(expr) => CallExpr::parse(envs, expr),
-            syn::Expr::BinOp(expr) => BinOpExpr::parse(envs, expr),
-            syn::Expr::UnOp(expr) => UnOpExpr::parse(envs, expr),
+            ya_syn::Expr::Let(expr) => LetExpr::parse(envs, expr),
+            ya_syn::Expr::Lit(expr) => LitExpr::parse(envs, expr),
+            ya_syn::Expr::VarName(expr) => VarExpr::parse(envs, expr),
+            ya_syn::Expr::Block(expr) => BlockExpr::parse(envs, expr),
+            ya_syn::Expr::Tuple(expr) => TupleExpr::parse(envs, expr),
+            ya_syn::Expr::Call(expr) => CallExpr::parse(envs, expr),
+            ya_syn::Expr::BinOp(expr) => BinOpExpr::parse(envs, expr),
+            ya_syn::Expr::UnOp(expr) => UnOpExpr::parse(envs, expr),
             _ => unimplemented!(),
         }
     }
@@ -81,7 +81,7 @@ pub struct LetExpr {
 }
 
 impl ParseSynExpr for LetExpr {
-    type SynExpr = syn::LetExpr;
+    type SynExpr = ya_syn::LetExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let errs = vec![];
@@ -111,13 +111,13 @@ pub enum LitKind {
     Float,
 }
 
-impl From<&syn::token::LitKind> for LitKind {
-    fn from(lit: &syn::token::LitKind) -> Self {
+impl From<&ya_syn::token::LitKind> for LitKind {
+    fn from(lit: &ya_syn::token::LitKind) -> Self {
         match lit {
-            syn::token::LitKind::String => LitKind::String,
-            syn::token::LitKind::Char => LitKind::Char,
-            syn::token::LitKind::Integer => LitKind::Integer,
-            syn::token::LitKind::Float => LitKind::Float,
+            ya_syn::token::LitKind::String => LitKind::String,
+            ya_syn::token::LitKind::Char => LitKind::Char,
+            ya_syn::token::LitKind::Integer => LitKind::Integer,
+            ya_syn::token::LitKind::Float => LitKind::Float,
         }
     }
 }
@@ -131,12 +131,12 @@ pub struct LitExpr {
 }
 
 impl ParseSynExpr for LitExpr {
-    type SynExpr = syn::token::Lit;
+    type SynExpr = ya_syn::token::Lit;
 
     fn parse(_envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let mut errs = vec![];
 
-        let ty = match <Result<PrimType, Error>>::from(expr) {
+        let ty = match Type::prim_type_from(expr) {
             Ok(ty) => Type::Prim(ty),
             Err(err) => {
                 errs.push(err);
@@ -163,7 +163,7 @@ pub struct VarExpr {
 }
 
 impl ParseSynExpr for VarExpr {
-    type SynExpr = syn::token::VarName;
+    type SynExpr = ya_syn::token::VarName;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let mut errs = vec![];
@@ -189,7 +189,7 @@ pub struct BlockExpr {
 }
 
 impl ParseSynExpr for BlockExpr {
-    type SynExpr = syn::BlockExpr;
+    type SynExpr = ya_syn::BlockExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let stmts = expr.stmts
@@ -222,7 +222,7 @@ pub struct TupleExpr {
 }
 
 impl ParseSynExpr for TupleExpr {
-    type SynExpr = syn::TupleExpr;
+    type SynExpr = ya_syn::TupleExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let errs = vec![];
@@ -254,7 +254,7 @@ pub struct CallExpr {
 }
 
 impl ParseSynExpr for CallExpr {
-    type SynExpr = syn::CallExpr;
+    type SynExpr = ya_syn::CallExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let mut errs = vec![];
@@ -335,7 +335,7 @@ impl BinOpExpr {
 }
 
 impl ParseSynExpr for BinOpExpr {
-    type SynExpr = syn::BinOpExpr;
+    type SynExpr = ya_syn::BinOpExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         struct OpFlatInfo {
@@ -372,7 +372,7 @@ impl ParseSynExpr for BinOpExpr {
                 };
 
                 match &*curr_op.rhs {
-                    syn::Expr::BinOp(bin_expr) => {
+                    ya_syn::Expr::BinOp(bin_expr) => {
                         operands.push(Some(Expr::parse(envs, &*bin_expr.lhs)));
                         push_flat_info(envs, &operands);
 
@@ -458,9 +458,9 @@ impl ParseSynExpr for BinOpExpr {
     }
 }
 
-impl From<syn::UnOpPos> for UnOpPos {
-    fn from(pos: syn::UnOpPos) -> Self {
-        if pos == syn::UnOpPos::Pre { UnOpPos::Pre } else { UnOpPos::Suf }
+impl From<ya_syn::UnOpPos> for UnOpPos {
+    fn from(pos: ya_syn::UnOpPos) -> Self {
+        if pos == ya_syn::UnOpPos::Pre { UnOpPos::Pre } else { UnOpPos::Suf }
     }
 }
 
@@ -472,7 +472,7 @@ pub struct UnOpExpr {
 }
 
 impl ParseSynExpr for UnOpExpr {
-    type SynExpr = syn::UnOpExpr;
+    type SynExpr = ya_syn::UnOpExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let mut errs = vec![];
@@ -508,7 +508,7 @@ pub struct FuncExpr {
 }
 
 // impl ParseSynExpr for FuncExpr {
-//     type SynExpr = syn::FuncExpr;
+//     type SynExpr = ya_syn::FuncExpr;
 
 //     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
 //         Expr {

@@ -1,5 +1,5 @@
-use crate::syntax_parser as syn;
-use crate::prim_type::PrimType;
+use ya_syn;
+use ya_prim_types::PrimType;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -65,7 +65,7 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn parse(syn_items: &Vec<syn::Item>, env: Env) -> Self {
+    pub fn parse(syn_items: &Vec<ya_syn::Item>, env: Env) -> Self {
         let mut global = EnvStack {
             envs: vec![env],
         };
@@ -75,9 +75,9 @@ impl Parser {
         let mut funcs = vec![];
         for item in syn_items {
             match item {
-                syn::Item::Def(expr) => {
+                ya_syn::Item::Def(expr) => {
                     let (name, ty) = match expr.lhs.as_ref() {
-                        syn::Expr::Let(expr) => {
+                        ya_syn::Expr::Let(expr) => {
                             (
                                 expr.var.name.clone(),
                                 expr.ty
@@ -110,13 +110,13 @@ impl Parser {
                     };
 
                     // add function to be parsed later
-                    if let (Some(Type::Func(_)), syn::Expr::Func(func)) = (&ty, expr.rhs.as_ref()) {
+                    if let (Some(Type::Func(_)), ya_syn::Expr::Func(func)) = (&ty, expr.rhs.as_ref()) {
                         funcs.push(func.body.as_ref());
                     }
 
                     global.envs.first_mut().unwrap().vars.insert(name, ty);
                 }
-                syn::Item::Eof => {},
+                ya_syn::Item::Eof => {},
             }
         }
 
