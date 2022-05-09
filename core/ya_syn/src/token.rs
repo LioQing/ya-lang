@@ -34,10 +34,17 @@ impl VarName {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Array {
+    pub ty: Box<TypeName>,
+    pub len: Lit,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum TypeName {
     PrimType(PrimType),
     Struct(String),
     Tuple(Vec<TypeName>),
+    Array(Array),
 }
 
 impl TypeName {
@@ -66,13 +73,23 @@ impl TypeName {
                 }
             }
             ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { .. }, .. } => {
-                if let ya_lexer::Token {
+                let ty = if let ya_lexer::Token {
                     kind: ya_lexer::TokenKind::Identifier { raw },
                     ..
                 } = lexer.next_token().unwrap() {
-                    Ok(Self::from_str(raw.as_str()).unwrap())
+                    Self::from_str(raw.as_str()).unwrap()
                 } else {
                     unreachable!()
+                };
+
+                match lexer.peek_token() {
+                    Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '[', .. }, .. }) => {
+                        let len = Bracketed::parse(lexer, &[Bracket::Square],
+                            |lexer| Lit::parse(lexer))?.inner;
+                        
+                        Ok(TypeName::Array(Array { ty: Box::new(ty), len }))
+                    },
+                    _ => Ok(ty),
                 }
             },
             _ => return Err(Error::ExpectedIdentifier { found: lexer.next_token().unwrap() }),

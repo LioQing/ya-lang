@@ -36,7 +36,7 @@ pub struct Expr {
 impl Expr {
     pub fn get_ty_from_syn(envs: &EnvStack, expr: &ya_syn::Expr) -> Result<Type, Error> {
         match expr {
-            ya_syn::Expr::Lit(lit) => Ok(Type::Prim(Type::prim_type_from(lit)?)),
+            ya_syn::Expr::Lit(lit) => Ok(Type::from_lit(lit)?),
             ya_syn::Expr::Func(func) => Ok(Type::Func(func.into())),
             ya_syn::Expr::VarName(name) => Ok(envs.get_def_var(name.name.as_str())?.clone()),
             _ => Ok(Type::Prim(PrimType::Unit)),
@@ -103,7 +103,7 @@ impl ParseSynExpr for LetExpr {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum LitKind {
     String,
     Char,
@@ -122,7 +122,7 @@ impl From<&ya_syn::token::LitKind> for LitKind {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct LitExpr {
     pub value: String,
     pub prefix: String,
@@ -130,14 +130,12 @@ pub struct LitExpr {
     pub kind: LitKind,
 }
 
-impl ParseSynExpr for LitExpr {
-    type SynExpr = ya_syn::token::Lit;
-
-    fn parse(_envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+impl LitExpr {
+    pub fn parse_without_env(expr: &ya_syn::token::Lit) -> Expr {
         let mut errs = vec![];
 
-        let ty = match Type::prim_type_from(expr) {
-            Ok(ty) => Type::Prim(ty),
+        let ty = match Type::from_lit(expr) {
+            Ok(ty) => ty,
             Err(err) => {
                 errs.push(err);
                 Type::Prim(PrimType::Unit)
@@ -154,6 +152,14 @@ impl ParseSynExpr for LitExpr {
             }),
             errs,
         }
+    }
+}
+
+impl ParseSynExpr for LitExpr {
+    type SynExpr = ya_syn::token::Lit;
+
+    fn parse(_envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+        LitExpr::parse_without_env(expr)
     }
 }
 

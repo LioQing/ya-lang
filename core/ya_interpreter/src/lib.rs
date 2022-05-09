@@ -47,7 +47,7 @@ pub fn run() {
         un_op_info!('-', Type::Prim(PrimType::I32) => Type::Prim(PrimType::I32)),
     ].into();
 
-    let src = std::fs::read_to_string("../examples/hello_world.ya").unwrap();
+    let src = std::fs::read_to_string("./examples/hello_world.ya").unwrap();
 
     let syn_parser = ya_syn::Parser::parse(&src);
 

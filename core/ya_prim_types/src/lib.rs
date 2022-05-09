@@ -7,4 +7,5 @@ pub enum PrimType {
     U8, U16, U32, U64,
     F32, F64,
     Char, Bool,
+    ISize, USize,
 }

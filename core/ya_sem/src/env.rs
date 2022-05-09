@@ -175,17 +175,18 @@ pub enum Type {
     Prim(PrimType),
     Struct(Vec<Field>),
     Tuple(Vec<Type>),
+    Array(ArrayType),
     Func(FuncType),
 }
 
 impl Type {
-    pub fn prim_type_from(lit: &ya_syn::token::Lit) -> Result<PrimType, Error> {
+    pub fn from_lit(lit: &ya_syn::token::Lit) -> Result<Type, Error> {
         match lit {
             ya_syn::token::Lit { suffix, kind: ya_syn::token::LitKind::Integer, .. } if suffix.is_empty() => {
-                Ok(PrimType::I32)
+                Ok(Self::Prim(PrimType::I32))
             },
             ya_syn::token::Lit { suffix, kind: ya_syn::token::LitKind::Float, .. } if suffix.is_empty() => {
-                Ok(PrimType::F32)
+                Ok(Self::Prim(PrimType::F32))
             },
             ya_syn::token::Lit {
                 suffix,
@@ -193,27 +194,41 @@ impl Type {
                 ..
             } => {
                 match (*kind, suffix.as_str()) {
-                    (ya_syn::token::LitKind::Integer, "")    => Ok(PrimType::I32),
-                    (ya_syn::token::LitKind::Float  , "")    => Ok(PrimType::F32),
-                    (ya_syn::token::LitKind::Integer, "i8" ) => Ok(PrimType::I8 ),
-                    (ya_syn::token::LitKind::Integer, "i16") => Ok(PrimType::I16),
-                    (ya_syn::token::LitKind::Integer, "i32") => Ok(PrimType::I32),
-                    (ya_syn::token::LitKind::Integer, "i64") => Ok(PrimType::I64),
-                    (ya_syn::token::LitKind::Integer, "u8" ) => Ok(PrimType::U8 ),
-                    (ya_syn::token::LitKind::Integer, "u16") => Ok(PrimType::U16),
-                    (ya_syn::token::LitKind::Integer, "u32") => Ok(PrimType::U32),
-                    (ya_syn::token::LitKind::Integer, "u64") => Ok(PrimType::U64),
-                    (ya_syn::token::LitKind::Integer | ya_syn::token::LitKind::Float, "f32") => Ok(PrimType::F32),
-                    (ya_syn::token::LitKind::Integer | ya_syn::token::LitKind::Float, "f64") => Ok(PrimType::F64),
+                    (ya_syn::token::LitKind::Integer, "")    => Ok(Self::Prim(PrimType::I32)),
+                    (ya_syn::token::LitKind::Float  , "")    => Ok(Self::Prim(PrimType::F32)),
+                    (ya_syn::token::LitKind::Integer, "i8" ) => Ok(Self::Prim(PrimType::I8 )),
+                    (ya_syn::token::LitKind::Integer, "i16") => Ok(Self::Prim(PrimType::I16)),
+                    (ya_syn::token::LitKind::Integer, "i32") => Ok(Self::Prim(PrimType::I32)),
+                    (ya_syn::token::LitKind::Integer, "i64") => Ok(Self::Prim(PrimType::I64)),
+                    (ya_syn::token::LitKind::Integer, "u8" ) => Ok(Self::Prim(PrimType::U8 )),
+                    (ya_syn::token::LitKind::Integer, "u16") => Ok(Self::Prim(PrimType::U16)),
+                    (ya_syn::token::LitKind::Integer, "u32") => Ok(Self::Prim(PrimType::U32)),
+                    (ya_syn::token::LitKind::Integer, "u64") => Ok(Self::Prim(PrimType::U64)),
+                    (ya_syn::token::LitKind::Integer | ya_syn::token::LitKind::Float, "f32") => Ok(Self::Prim(PrimType::F32)),
+                    (ya_syn::token::LitKind::Integer | ya_syn::token::LitKind::Float, "f64") => Ok(Self::Prim(PrimType::F64)),
                     _ => Err(Error::InvalidLiteralSuffix { suffix: suffix.clone() }),
                 }
             },
             ya_syn::token::Lit { kind: ya_syn::token::LitKind::Char, .. } => {
-                Ok(PrimType::Char)
+                Ok(Self::Prim(PrimType::Char))
             },
-            _ => {
-                unimplemented!()
+            ya_syn::token::Lit {
+                value,
+                prefix,
+                suffix,
+                kind: ya_syn::token::LitKind::String,
+            } if prefix.is_empty() && suffix.is_empty() && value.is_ascii() => {
+                Ok(Self::Array(ArrayType {
+                    ty: Box::new(Self::Prim(PrimType::Char)),
+                    len: LitExpr {
+                        value: value.clone(),
+                        prefix: prefix.clone(),
+                        suffix: suffix.clone(),
+                        kind: LitKind::String,
+                    },
+                }))
             },
+            _ => unimplemented!(),
         }
     }
 }
@@ -223,9 +238,35 @@ impl From<&ya_syn::token::TypeName> for Type {
         match ty {
             ya_syn::token::TypeName::PrimType(prim_type) => Type::Prim(*prim_type),
             ya_syn::token::TypeName::Struct(_) => Type::Struct(vec![]),
-            ya_syn::token::TypeName::Tuple(tys) => Type::Tuple(tys.iter().map(|ty| ty.into()).collect()),
+            ya_syn::token::TypeName::Tuple(tys) => Type::Tuple(
+                tys
+                    .iter()
+                    .map(|ty| ty.into())
+                    .collect()
+            ),
+            ya_syn::token::TypeName::Array(ty) => {
+                let len = if let Expr {
+                    kind: ExprKind::Lit(lit),
+                    ..
+                } = LitExpr::parse_without_env(&ty.len) {
+                    lit
+                } else {
+                    unreachable!();
+                };
+
+                Type::Array(ArrayType {
+                    ty: Box::new(ty.ty.as_ref().into()),
+                    len,
+                })
+            },
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct ArrayType {
+    pub ty: Box<Type>,
+    pub len: LitExpr,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
