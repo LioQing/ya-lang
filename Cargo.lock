@@ -117,10 +117,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "ya_lang"
+name = "ya_interpreter"
 version = "0.1.0"
 dependencies = [
  "ya_core",
+]
+
+[[package]]
+name = "ya_lang"
+version = "0.1.0"
+dependencies = [
+ "ya_interpreter",
 ]
 
 [[package]]

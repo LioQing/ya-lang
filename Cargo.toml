@@ -11,7 +11,8 @@ members = [
     "./core/ya_lexer",
     "./core/ya_syn",
     "./core/ya_sem",
+    "./core/ya_interpreter",
 ]
 
 [dependencies]
-ya_core = { path = "./core/ya_core" }
+ya_interpreter = { path = "./core/ya_interpreter" }

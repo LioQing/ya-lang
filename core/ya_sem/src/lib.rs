@@ -88,8 +88,7 @@ impl Parser {
                         _ => unimplemented!(),
                     };
                     
-                    let deduced_ty = match Expr::get_ty_from_syn(&global, expr.rhs.as_ref())
-                    {
+                    let deduced_ty = match Expr::get_ty_from_syn(&global, expr.rhs.as_ref()) {
                         Err(err) => {
                             errs.push(err);
                             continue;

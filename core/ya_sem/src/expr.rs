@@ -503,7 +503,6 @@ impl ParseSynExpr for UnOpExpr {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FuncExpr {
-    pub ty: FuncType,
     pub id: usize,
 }
 
@@ -511,11 +510,15 @@ pub struct FuncExpr {
 //     type SynExpr = ya_syn::FuncExpr;
 
 //     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+//         let mut errs = vec![];
+//         let ty = Type::Func(expr.into());
+
 //         Expr {
 //             ty,
 //             kind: ExprKind::Func(FuncExpr {
+//                 id: 0,
 //             }),
-//             errs: vec![],
+//             errs,
 //         }
 //     }
 // }

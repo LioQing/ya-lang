@@ -80,7 +80,7 @@ impl Env {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EnvStack {
     pub envs: Vec<Env>,
 }
