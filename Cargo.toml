@@ -5,5 +5,13 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = [
+    "./core/ya_core",
+    "./core/ya_lexer",
+    "./core/ya_syn",
+    "./core/ya_sem",
+]
+
 [dependencies]
 ya_core = { path = "./core/ya_core" }
