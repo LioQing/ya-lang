@@ -463,7 +463,6 @@ impl ParseSynExpr for BinOpExpr {
             let root = op_flat_infos
                 .iter()
                 .enumerate()
-                .rev()
                 .max_by(|(_, a), (_, b)| a.info.prec.cmp(&b.info.prec))
                 .unwrap();
             
@@ -471,6 +470,7 @@ impl ParseSynExpr for BinOpExpr {
                 op_flat_infos
                     .iter()
                     .enumerate()
+                    .rev()
                     .max_by(|(_, a), (_, b)| a.info.prec.cmp(&b.info.prec))
                     .map(|(idx, _)| idx)
                     .unwrap()

@@ -62,5 +62,76 @@ pub fn run() {
     );
 
     println!("env: {:#?}", sem_parser.global_env);
-    println!("errs: {:#?}", sem_parser.errs);
+    println!("items: {:#?}", sem_parser.items);
+
+    let main = sem_parser.items
+        .iter()
+        .find_map(|item| match item {
+            ya_sem::Expr {
+                kind: ya_sem::ExprKind::BinOp(ya_sem::BinOpExpr {
+                    op,
+                    lhs,
+                    rhs,
+                }),
+                ..
+            } if op.as_str() == "=" => {
+                match (lhs.as_ref(), rhs.as_ref()) {
+                    (
+                        ya_sem::Expr { kind: ya_sem::ExprKind::Let(ya_sem::LetExpr { var }), .. },
+                        ya_sem::Expr { kind: ya_sem::ExprKind::Func(ya_sem::FuncExpr { id }), .. },
+                    ) if var.as_str() == "main" => {
+                        Some(&sem_parser.global_env.funcs[*id])
+                    },
+                    _ => None,
+                }
+            },
+            _ => None,
+        })
+        .expect("Cannot find main function");
+    
+    match main {
+        ya_sem::Expr { kind: ya_sem::ExprKind::Block(expr), .. } => {
+            expr.expr.as_ref().map(|expr| {
+                println!("main return: {:?}", run_expr(expr.as_ref()));
+            });
+        },
+        _ => unreachable!(),
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum ExprVal {
+    I32(i32),
+}
+
+fn run_expr(expr: &ya_sem::Expr) -> ExprVal {
+    match &expr.kind {
+        ya_sem::ExprKind::Lit(ya_sem::LitExpr { value, kind, .. }) => {
+            match kind {
+                ya_sem::LitKind::Integer => ExprVal::I32(value.parse().expect("failed to parse int literal")),
+                _ => unimplemented!(),
+            }
+        },
+        ya_sem::ExprKind::BinOp(ya_sem::BinOpExpr { op, lhs, rhs }) => {
+            match op.as_str() {
+                "+" => match (run_expr(lhs.as_ref()), run_expr(rhs.as_ref())) {
+                    (ExprVal::I32(l), ExprVal::I32(r)) => ExprVal::I32(l + r),
+                },
+                "-" => match (run_expr(lhs.as_ref()), run_expr(rhs.as_ref())) {
+                    (ExprVal::I32(l), ExprVal::I32(r)) => ExprVal::I32(l - r),
+                },
+                "*" => match (run_expr(lhs.as_ref()), run_expr(rhs.as_ref())) {
+                    (ExprVal::I32(l), ExprVal::I32(r)) => ExprVal::I32(l * r),
+                },
+                "/" => match (run_expr(lhs.as_ref()), run_expr(rhs.as_ref())) {
+                    (ExprVal::I32(l), ExprVal::I32(r)) => ExprVal::I32(l / r),
+                },
+                "%" => match (run_expr(lhs.as_ref()), run_expr(rhs.as_ref())) {
+                    (ExprVal::I32(l), ExprVal::I32(r)) => ExprVal::I32(l % r),
+                },
+                _ => unimplemented!(),
+            }
+        },
+        _ => unimplemented!(),
+    }
 }

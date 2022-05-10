@@ -3,7 +3,7 @@ use super::*;
 #[derive(Debug, PartialEq)]
 pub enum Item {
     Eof,
-    Def(BinOpExpr),
+    Let(Expr),
 }
 
 impl Item {
@@ -11,7 +11,7 @@ impl Item {
         match lexer.peek_token() {
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { raw }, .. }) if raw.as_str() == "let" => {
                 let expr = Expr::Let(LetExpr::parse(lexer)?);
-                Ok(Item::Def(BinOpExpr::parse(lexer, expr)?))
+                Ok(Item::Let(Expr::BinOp(BinOpExpr::parse(lexer, expr)?)))
             },
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Eof, .. }) => {
                 lexer.next_token().unwrap();

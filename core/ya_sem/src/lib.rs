@@ -60,7 +60,7 @@ pub enum Error {
 /// Parse the parse tree into an AST.
 pub struct Parser {
     pub global_env: EnvStack,
-    pub errs: Vec<Error>,
+    pub items: Vec<Expr>,
 }
 
 impl Parser {
@@ -69,75 +69,21 @@ impl Parser {
             envs: vec![env],
             funcs: vec![],
         };
-        let mut errs = vec![];
+        let mut items = vec![];
 
         // first scan: global items
-        let mut funcs = vec![];
         for item in syn_items {
             match item {
-                ya_syn::Item::Def(expr) => {
-                    let (name, ty) = match expr.lhs.as_ref() {
-                        ya_syn::Expr::Let(expr) => {
-                            (
-                                expr.var.name.clone(),
-                                expr.ty
-                                    .as_ref()
-                                    .map(|ty| ty.into()),
-                            )
-                        },
-                        _ => unimplemented!(),
-                    };
-                    
-                    let deduced_ty = match Expr::get_ty_from_syn(&global, expr.rhs.as_ref()) {
-                        Err(err) => {
-                            errs.push(err);
-                            continue;
-                        },
-                        ty => ty.ok(),
-                    };
-
-                    let ty = match (ty, deduced_ty) {
-                        (Some(ty1), Some(ty2)) if ty1 != ty2 => {
-                            errs.push(Error::ConflictingTypes { type1: ty1, type2: ty2 });
-                            continue;
-                        },
-                        (_, Some(ty)) | (Some(ty), _) =>  Some(ty),
-                        (None, None) => {
-                            errs.push(Error::GlobalVarNotDefined { var: name });
-                            continue;
-                        },
-                    };
-
-                    // add function to be parsed later
-                    if let (Some(Type::Func(_)), ya_syn::Expr::Func(func)) = (&ty, expr.rhs.as_ref()) {
-                        funcs.push((
-                            func.params
-                                .iter()
-                                .map(|param| (param.name.name.clone(), Some((&param.ty).into())))
-                                .collect::<HashMap<_, _>>(),
-                            func.body.as_ref(),
-                        ));
-                    }
-
-                    global.envs.first_mut().unwrap().vars.insert(name, ty);
+                ya_syn::Item::Let(expr) => {
+                    items.push(Expr::parse(&mut global, expr));
                 }
                 ya_syn::Item::Eof => {},
             }
         }
 
-        // second scan: function body codes
-        let funcs = funcs
-            .into_iter()
-            .map(|(vars, expr)| {
-                BlockExpr::parse_with_local_vars(&mut global, expr, vars)
-            })
-            .collect::<Vec<_>>();
-        
-        global.funcs.extend(funcs);
-
         Self {
             global_env: global,
-            errs,
+            items,
         }
     }
 }

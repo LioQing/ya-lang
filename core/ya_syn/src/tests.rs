@@ -5,7 +5,7 @@ fn empty_func() {
     let parser = Parser::parse("let main = () {}");
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
+    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -19,7 +19,7 @@ fn empty_func() {
                 expr: None,
             }),
         })),
-    }));
+    })));
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn hello_world_func() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
+    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "hello_world".to_owned() },
@@ -57,7 +57,7 @@ fn hello_world_func() {
                 expr: None,
             }),
         })),
-    }));
+    })));
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn add_i32_func() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
+    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "add".to_owned() },
@@ -111,7 +111,7 @@ fn add_i32_func() {
                 }))),
             }),
         })),
-    }));
+    })));
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn extreme_empty_func() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
+    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -138,7 +138,7 @@ fn extreme_empty_func() {
                 expr: Some(Box::new(Expr::VarName(token::VarName { name: "b".to_owned() }))),
             }),
         })),
-    }));
+    })));
 }
 
 #[test]
@@ -153,7 +153,7 @@ fn func_params_ret_and_let_expr() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
+    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -201,7 +201,7 @@ fn func_params_ret_and_let_expr() {
                 expr: None,
             }),
         })),
-    }));
+    })));
 }
 
 #[test]
@@ -213,7 +213,7 @@ fn tuple_and_unit() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
+    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -252,7 +252,7 @@ fn tuple_and_unit() {
                 }))),
             }),
         }))
-    }));
+    })));
 }
 
 #[test]
@@ -277,7 +277,7 @@ fn unary_operators() {
     "#);
     
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Def(BinOpExpr {
+    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
         op: token::Operator { op: "=".to_owned() },
         lhs: Box::new(Expr::Let(LetExpr {
             var: token::VarName { name: "main".to_owned() },
@@ -691,5 +691,5 @@ fn unary_operators() {
                 expr: None,
             }),
         }))
-    }));
+    })));
 }
