@@ -104,6 +104,26 @@ pub struct ConstExpr {
     pub var: String,
 }
 
+impl ConstExpr {
+    pub fn parse_decl(envs: &mut EnvStack, expr: &ya_syn::ConstExpr) -> Expr {
+        let expr = Self::parse(envs, expr);
+
+        if let ExprKind::Const(Self { ref var }) = expr.kind {
+            envs.envs
+                .last_mut()
+                .expect("No environment found").consts
+                .insert(var.clone(), ConstInfo {
+                    ty: expr.ty.clone(),
+                    expr: Expr::new_ok(Type::Prim(PrimType::Unit), ExprKind::Block(BlockExpr { stmts: vec![], expr: None })),
+                });
+        } else {
+            unreachable!();
+        }
+
+        expr
+    }
+}
+
 impl ParseSynExpr for ConstExpr {
     type SynExpr = ya_syn::ConstExpr;
 
@@ -126,14 +146,6 @@ impl ParseSynExpr for ConstExpr {
                 Type::Prim(PrimType::Unit)
             }
         };
-
-        envs.envs
-            .last_mut()
-            .expect("No environment found").consts
-            .insert(var.clone(), ConstInfo {
-                ty: ty.clone(),
-                expr: Expr::new_ok(Type::Prim(PrimType::Unit), ExprKind::Block(BlockExpr { stmts: vec![], expr: None })),
-            });
 
         Expr::new(
             ty,
@@ -279,9 +291,11 @@ impl ParseSynExpr for BlockExpr {
                 }
             }))
             .map(|expr| {
-                Expr::parse(envs, expr);
                 match expr {
-                    ya_syn::Expr::Const(expr) => expr,
+                    ya_syn::Expr::Const(expr) => {
+                        ConstExpr::parse_decl(envs, expr);
+                        expr
+                    },
                     _ => unreachable!(),
                 }
             })

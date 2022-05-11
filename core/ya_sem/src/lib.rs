@@ -84,8 +84,11 @@ impl Parser {
         let item_decls = syn_items
             .iter()
             .map(|item| match item {
-                    ya_syn::Item::Const(expr @ ya_syn::Expr::Const(ya_syn::ConstExpr { expr: rhs, .. })) => {
-                        Some((Expr::parse(&mut global, expr), &**rhs))
+                    ya_syn::Item::Const(ya_syn::Expr::Const(expr @ ya_syn::ConstExpr {
+                        expr: rhs,
+                        ..
+                    })) => {
+                        Some((ConstExpr::parse_decl(&mut global, expr), &**rhs))
                     },
                     ya_syn::Item::Eof => None,
                     _ => unreachable!(),

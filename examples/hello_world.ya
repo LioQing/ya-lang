@@ -1,4 +1,6 @@
 const main = () {
     println();
-    const println = () -> i32 {123};
+    const println = () -> i32 {
+        1 + 1
+    };
 }
