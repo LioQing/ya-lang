@@ -269,18 +269,18 @@ impl Type {
     }
 }
 
-impl From<&ya_syn::token::TypeName> for Type {
-    fn from(ty: &ya_syn::token::TypeName) -> Self {
+impl From<&ya_syn::token::Type> for Type {
+    fn from(ty: &ya_syn::token::Type) -> Self {
         match ty {
-            ya_syn::token::TypeName::PrimType(prim_type) => Type::Prim(*prim_type),
-            ya_syn::token::TypeName::Struct(_) => Type::Struct(vec![]),
-            ya_syn::token::TypeName::Tuple(tys) => Type::Tuple(
+            ya_syn::token::Type::PrimType(prim_type) => Type::Prim(*prim_type),
+            ya_syn::token::Type::Struct(_) => Type::Struct(vec![]),
+            ya_syn::token::Type::Tuple(tys) => Type::Tuple(
                 tys
                     .iter()
                     .map(|ty| ty.into())
                     .collect()
             ),
-            ya_syn::token::TypeName::Array(ty) => {
+            ya_syn::token::Type::Array(ty) => {
                 let len = if let Expr {
                     kind: ExprKind::Lit(lit),
                     ..

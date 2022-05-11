@@ -21,11 +21,11 @@ impl Keyword {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct VarName {
+pub struct Symbol {
     pub name: String,
 }
 
-impl VarName {
+impl Symbol {
     pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         match lexer.next_token()? {
             ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { raw }, .. } => Ok(Self { name: raw }),
@@ -36,19 +36,19 @@ impl VarName {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Array {
-    pub ty: Box<TypeName>,
+    pub ty: Box<Type>,
     pub len: Lit,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum TypeName {
+pub enum Type {
     PrimType(PrimType),
     Struct(String),
-    Tuple(Vec<TypeName>),
+    Tuple(Vec<Type>),
     Array(Array),
 }
 
-impl TypeName {
+impl Type {
     pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         match lexer.peek_token()? {
             ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '(', .. }, .. } => {
@@ -88,7 +88,7 @@ impl TypeName {
                         let len = Bracketed::parse(lexer, &[Bracket::Square],
                             |lexer| Lit::parse(lexer))?.inner;
                         
-                        Ok(TypeName::Array(Array { ty: Box::new(ty), len }))
+                        Ok(Type::Array(Array { ty: Box::new(ty), len }))
                     },
                     _ => Ok(ty),
                 }
@@ -98,7 +98,7 @@ impl TypeName {
     }
 }
 
-impl std::str::FromStr for TypeName {
+impl std::str::FromStr for Type {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, ()> {

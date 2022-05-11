@@ -2,17 +2,17 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    /** const: const $var_name $[: $type_name] = $expr */
+    /** const: const $symbol $[: $type] = $expr */
     Const(ConstExpr),
 
-    /** let: let $var_name $[: $type_name]? */
+    /** let: let $symbol $[: $type]? */
     Let(LetExpr),
 
     /** numeric or string or char literal */
     Lit(token::Lit),
 
-    /** variable name */
-    VarName(token::VarName),
+    /** symbol: variable/const names */
+    Symbol(token::Symbol),
 
     /** block: `{ $[$expr$[;]+]* $[$expr]? }` */
     Block(BlockExpr),
@@ -110,7 +110,7 @@ impl Expr {
                 Ok(Self::Lit(token::Lit::parse(lexer)?))
             },
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { .. }, .. }) => {
-                Ok(Self::VarName(token::VarName::parse(lexer)?))
+                Ok(Self::Symbol(token::Symbol::parse(lexer)?))
             },
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '{', .. }, .. }) => {
                 Ok(Self::Block(BlockExpr::parse(lexer)?))
@@ -242,20 +242,20 @@ impl TupleExpr {
 
 #[derive(Debug, PartialEq)]
 pub struct ConstExpr {
-    pub var: token::VarName,
-    pub ty: Option<token::TypeName>,
+    pub symbol: token::Symbol,
+    pub ty: Option<token::Type>,
     pub expr: Box<Expr>,
 }
 
 impl ConstExpr {
     pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         token::Keyword::parse(lexer, &["const"])?;
-        let var = token::VarName::parse(lexer)?;
+        let symbol = token::Symbol::parse(lexer)?;
 
         let ty = match lexer.peek_token() {
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == ":" => {
                 lexer.next_token()?;
-                Some(token::TypeName::parse(lexer)?)
+                Some(token::Type::parse(lexer)?)
             },
             _ => None,
         };
@@ -264,30 +264,30 @@ impl ConstExpr {
 
         let expr = Box::new(Expr::parse(lexer)?);
 
-        Ok(Self { var, ty, expr })
+        Ok(Self { symbol, ty, expr })
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct LetExpr {
-    pub var: token::VarName,
-    pub ty: Option<token::TypeName>,
+    pub symbol: token::Symbol,
+    pub ty: Option<token::Type>,
 }
 
 impl LetExpr {
     pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         token::Keyword::parse(lexer, &["let"])?;
-        let var = token::VarName::parse(lexer)?;
+        let symbol = token::Symbol::parse(lexer)?;
 
         let ty = match lexer.peek_token() {
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == ":" => {
                 lexer.next_token()?;
-                Some(token::TypeName::parse(lexer)?)
+                Some(token::Type::parse(lexer)?)
             },
             _ => None,
         };
 
-        Ok(Self { var, ty })
+        Ok(Self { symbol, ty })
     }
 }
 
@@ -410,7 +410,7 @@ impl UnOpExpr {
 #[derive(Debug, PartialEq)]
 pub struct FuncExpr {
     pub params: Vec<VarTypeDecl>,
-    pub ret_ty: token::TypeName,
+    pub ret_ty: token::Type,
     pub body: Box<BlockExpr>,
 }
 
@@ -441,9 +441,9 @@ impl FuncExpr {
         let ret_ty = match lexer.peek_token() {
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == "->" => {
                 token::Operator::parse_with(lexer, &["->"]).unwrap();
-                token::TypeName::parse(lexer)?
+                token::Type::parse(lexer)?
             },
-            _ => token::TypeName::PrimType(PrimType::Unit),
+            _ => token::Type::PrimType(PrimType::Unit),
         };
 
         // body

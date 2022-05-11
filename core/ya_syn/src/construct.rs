@@ -225,15 +225,15 @@ impl<T> Separated<T> {
 
 #[derive(Debug, PartialEq)]
 pub struct VarTypeDecl {
-    pub name: token::VarName,
-    pub ty: token::TypeName,
+    pub name: token::Symbol,
+    pub ty: token::Type,
 }
 
 impl VarTypeDecl {
     pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
-        let name = token::VarName::parse(lexer)?;
+        let name = token::Symbol::parse(lexer)?;
         token::Operator::parse_with(lexer, &[":"])?;
-        let ty = token::TypeName::parse(lexer)?;
+        let ty = token::Type::parse(lexer)?;
 
         Ok(Self { name, ty })
     }

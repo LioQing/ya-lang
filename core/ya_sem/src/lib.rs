@@ -14,8 +14,8 @@ pub use env::*;
 
 #[derive(Error, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Error {
-    #[error("Global variable {var} not defined")]
-    GlobalVarNotDefined { var: String },
+    #[error("Global symbol {symbol} not defined")]
+    GlobalVarNotDefined { symbol: String },
 
     #[error("Invalid literal suffix {suffix}")]
     InvalidLiteralSuffix { suffix: String },
@@ -108,7 +108,7 @@ impl Parser {
                     global.envs
                         .last_mut()
                         .expect("Cannot find environment")
-                        .get_const_mut(const_expr.var.as_str())
+                        .get_const_mut(const_expr.symbol.as_str())
                         .expect("Cannot find constant")
                         .expr = Expr::parse(&mut global, rhs);
                     items.push(Expr { ty, kind: ExprKind::Const(const_expr), errs, env });

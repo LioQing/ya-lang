@@ -7,10 +7,10 @@ fn empty_func() {
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
         ty: None,
-        var: token::VarName { name: "main".to_owned() },
+        symbol: token::Symbol { name: "main".to_owned() },
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
-            ret_ty: token::TypeName::PrimType(PrimType::Unit),
+            ret_ty: token::Type::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
                 stmts: vec![],
                 expr: None,
@@ -30,14 +30,14 @@ fn hello_world_func() {
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
         ty: None,
-        var: token::VarName { name: "hello_world".to_owned() },
+        symbol: token::Symbol { name: "hello_world".to_owned() },
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
-            ret_ty: token::TypeName::PrimType(PrimType::Unit),
+            ret_ty: token::Type::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
                 stmts: vec![
                     Expr::Call(CallExpr {
-                        callee: Box::new(Expr::VarName(token::VarName { name: "println".to_owned() })),
+                        callee: Box::new(Expr::Symbol(token::Symbol { name: "println".to_owned() })),
                         args: vec![
                             Expr::Lit(token::Lit {
                                 value: "Hello World!".to_owned(),
@@ -66,23 +66,23 @@ fn add_i32_func() {
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
         ty: None,
-        var: token::VarName { name: "add".to_owned() },
+        symbol: token::Symbol { name: "add".to_owned() },
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![
                 VarTypeDecl {
-                    name: token::VarName { name: "a".to_owned() },
-                    ty: token::TypeName::PrimType(PrimType::I32),
+                    name: token::Symbol { name: "a".to_owned() },
+                    ty: token::Type::PrimType(PrimType::I32),
                 },
                 VarTypeDecl {
-                    name: token::VarName { name: "b".to_owned() },
-                    ty: token::TypeName::PrimType(PrimType::I32),
+                    name: token::Symbol { name: "b".to_owned() },
+                    ty: token::Type::PrimType(PrimType::I32),
                 },
             ],
-            ret_ty: token::TypeName::PrimType(PrimType::I32),
+            ret_ty: token::Type::PrimType(PrimType::I32),
             body: Box::new(BlockExpr {
                 stmts: vec![
                     Expr::Call(CallExpr {
-                        callee: Box::new(Expr::VarName(token::VarName { name: "println".to_owned() })),
+                        callee: Box::new(Expr::Symbol(token::Symbol { name: "println".to_owned() })),
                         args: vec![
                             Expr::Lit(token::Lit {
                                 value: "Adding {} and {}".to_owned(),
@@ -90,15 +90,15 @@ fn add_i32_func() {
                                 suffix: "".to_owned(),
                                 kind: token::LitKind::String,
                             }),
-                            Expr::VarName(token::VarName { name: "a".to_owned() }),
-                            Expr::VarName(token::VarName { name: "b".to_owned() }),
+                            Expr::Symbol(token::Symbol { name: "a".to_owned() }),
+                            Expr::Symbol(token::Symbol { name: "b".to_owned() }),
                         ],
                     })
                 ],
                 expr: Some(Box::new(Expr::BinOp(BinOpExpr {
                     op: token::Operator { op: "+".to_owned() },
-                    lhs: Box::new(Expr::VarName(token::VarName { name: "a".to_owned() })),
-                    rhs: Box::new(Expr::VarName(token::VarName { name: "b".to_owned() })),
+                    lhs: Box::new(Expr::Symbol(token::Symbol { name: "a".to_owned() })),
+                    rhs: Box::new(Expr::Symbol(token::Symbol { name: "b".to_owned() })),
                 }))),
             }),
         })),
@@ -117,13 +117,13 @@ fn extreme_empty_func() {
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
         ty: None,
-        var: token::VarName { name: "main".to_owned() },
+        symbol: token::Symbol { name: "main".to_owned() },
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
-            ret_ty: token::TypeName::PrimType(PrimType::Unit),
+            ret_ty: token::Type::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
-                stmts: vec![Expr::VarName(token::VarName { name: "a".to_owned() })],
-                expr: Some(Box::new(Expr::VarName(token::VarName { name: "b".to_owned() }))),
+                stmts: vec![Expr::Symbol(token::Symbol { name: "a".to_owned() })],
+                expr: Some(Box::new(Expr::Symbol(token::Symbol { name: "b".to_owned() }))),
             }),
         })),
     })));
@@ -143,44 +143,44 @@ fn func_params_ret_and_let_expr() {
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
         ty: None,
-        var: token::VarName { name: "main".to_owned() },
+        symbol: token::Symbol { name: "main".to_owned() },
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![
                 VarTypeDecl {
-                    name: token::VarName { name: "argc".to_owned() },
-                    ty: token::TypeName::PrimType(PrimType::I32),
+                    name: token::Symbol { name: "argc".to_owned() },
+                    ty: token::Type::PrimType(PrimType::I32),
                 },
                 VarTypeDecl {
-                    name: token::VarName { name: "argv".to_owned() },
-                    ty: token::TypeName::PrimType(PrimType::U8),
+                    name: token::Symbol { name: "argv".to_owned() },
+                    ty: token::Type::PrimType(PrimType::U8),
                 },
             ],
-            ret_ty: token::TypeName::PrimType(PrimType::Bool),
+            ret_ty: token::Type::PrimType(PrimType::Bool),
             body: Box::new(BlockExpr {
                 stmts: vec![
                     Expr::Let(LetExpr {
-                        var: token::VarName { name: "a".to_owned() },
+                        symbol: token::Symbol { name: "a".to_owned() },
                         ty: None,
                     }),
                     Expr::Let(LetExpr {
-                        var: token::VarName { name: "b".to_owned() },
-                        ty: Some(token::TypeName::PrimType(PrimType::I32)),
+                        symbol: token::Symbol { name: "b".to_owned() },
+                        ty: Some(token::Type::PrimType(PrimType::I32)),
                     }),
                     Expr::BinOp(BinOpExpr {
                         op: token::Operator { op: "=".to_owned() },
                         lhs: Box::new(Expr::Let(LetExpr {
-                            var: token::VarName { name: "a".to_owned() },
+                            symbol: token::Symbol { name: "a".to_owned() },
                             ty: None,
                         })),
-                        rhs: Box::new(Expr::VarName(token::VarName { name: "b".to_owned() })),
+                        rhs: Box::new(Expr::Symbol(token::Symbol { name: "b".to_owned() })),
                     }),
                     Expr::BinOp(BinOpExpr {
                         op: token::Operator { op: "=".to_owned() },
                         lhs: Box::new(Expr::Let(LetExpr {
-                            var: token::VarName { name: "a".to_owned() },
-                            ty: Some(token::TypeName::PrimType(PrimType::I32)),
+                            symbol: token::Symbol { name: "a".to_owned() },
+                            ty: Some(token::Type::PrimType(PrimType::I32)),
                         })),
-                        rhs: Box::new(Expr::VarName(token::VarName { name: "b".to_owned() })),
+                        rhs: Box::new(Expr::Symbol(token::Symbol { name: "b".to_owned() })),
                     }),
                 ],
                 expr: None,
@@ -200,14 +200,14 @@ fn tuple_and_unit() {
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
         ty: None,
-        var: token::VarName { name: "main".to_owned() },
+        symbol: token::Symbol { name: "main".to_owned() },
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
-            ret_ty: token::TypeName::Tuple(vec![
-                token::TypeName::PrimType(PrimType::I32),
-                token::TypeName::Tuple(vec![
-                    token::TypeName::PrimType(PrimType::Unit),
-                    token::TypeName::PrimType(PrimType::I64),
+            ret_ty: token::Type::Tuple(vec![
+                token::Type::PrimType(PrimType::I32),
+                token::Type::Tuple(vec![
+                    token::Type::PrimType(PrimType::Unit),
+                    token::Type::PrimType(PrimType::I64),
                 ]),
             ]),
             body: Box::new(BlockExpr {
@@ -216,8 +216,8 @@ fn tuple_and_unit() {
                     items: vec![
                         Expr::BinOp(BinOpExpr {
                             op: token::Operator { op: "+".to_owned() },
-                            lhs: Box::new(Expr::VarName(token::VarName { name: "a".to_owned() })),
-                            rhs: Box::new(Expr::VarName(token::VarName { name: "b".to_owned() })),
+                            lhs: Box::new(Expr::Symbol(token::Symbol { name: "a".to_owned() })),
+                            rhs: Box::new(Expr::Symbol(token::Symbol { name: "b".to_owned() })),
                         }),
                         Expr::Tuple(TupleExpr {
                             items: vec![
@@ -261,10 +261,10 @@ fn unary_operators() {
     assert_eq!(parser.items.len(), 1);
     assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
         ty: None,
-        var: token::VarName { name: "main".to_owned() },
+        symbol: token::Symbol { name: "main".to_owned() },
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
-            ret_ty: token::TypeName::PrimType(PrimType::Unit),
+            ret_ty: token::Type::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
                 stmts: vec![
                     Expr::BinOp(
