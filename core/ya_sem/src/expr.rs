@@ -16,6 +16,7 @@ pub trait ParseSynExpr where Self: Sized {
             vars: local_vars,
             bin_ops: HashMap::new(),
             un_ops: HashMap::new(),
+            consts: HashMap::new(),
         });
 
         let mut expr = Self::parse(envs, expr);
@@ -26,7 +27,7 @@ pub trait ParseSynExpr where Self: Sized {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Expr {
     pub ty: Type,
     pub kind: ExprKind,
@@ -52,7 +53,14 @@ impl Expr {
         match expr {
             ya_syn::Expr::Lit(lit) => Ok(Type::from_lit(lit)?),
             ya_syn::Expr::Func(func) => Ok(Type::Func(func.into())),
-            ya_syn::Expr::VarName(name) => Ok(envs.get_def_var(name.name.as_str())?.clone()),
+            ya_syn::Expr::VarName(name) => Ok(
+                envs
+                    .get_const(name.name.as_str())
+                    .map(|c| c.ty.clone())
+                    .or_else(|_| envs
+                        .get_def_var(name.name.as_str())
+                        .map(|ty| ty.clone()))?
+            ),
             _ => Ok(Type::Prim(PrimType::Unit)),
         }
     }
@@ -63,6 +71,7 @@ impl ParseSynExpr for Expr {
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         match expr {
+            ya_syn::Expr::Const(expr) => ConstExpr::parse(envs, expr),
             ya_syn::Expr::Let(expr) => LetExpr::parse(envs, expr),
             ya_syn::Expr::Lit(expr) => LitExpr::parse(envs, expr),
             ya_syn::Expr::VarName(expr) => VarExpr::parse(envs, expr),
@@ -76,8 +85,9 @@ impl ParseSynExpr for Expr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ExprKind {
+    Const(ConstExpr),
     Let(LetExpr),
     Lit(LitExpr),
     Var(VarExpr),
@@ -89,7 +99,53 @@ pub enum ExprKind {
     Func(FuncExpr),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ConstExpr {
+    pub var: String,
+}
+
+impl ParseSynExpr for ConstExpr {
+    type SynExpr = ya_syn::ConstExpr;
+
+    fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+        let mut errs = vec![];
+
+        let var = expr.var.name.clone();
+        let ty: Option<Type> = expr.ty.as_ref().map(|ty| ty.into());
+        let deduced_ty = Expr::get_ty_from_syn(envs, &expr.expr)
+            .unwrap_or_else(|err| {
+                errs.push(err);
+                Type::Prim(PrimType::Unit)
+            });
+        
+        let ty = match (ty, deduced_ty) {
+            (None, ty) => ty,
+            (Some(l), r) if l == r => l,
+            (Some(l), r) => {
+                errs.push(Error::AssignmentMismatchedOperandTypes { lhs: l, rhs: r });
+                Type::Prim(PrimType::Unit)
+            }
+        };
+
+        envs.envs
+            .last_mut()
+            .expect("No environment found").consts
+            .insert(var.clone(), ConstInfo {
+                ty: ty.clone(),
+                expr: Expr::new_ok(Type::Prim(PrimType::Unit), ExprKind::Block(BlockExpr { stmts: vec![], expr: None })),
+            });
+
+        Expr::new(
+            ty,
+            ExprKind::Const(Self {
+                var,
+            }),
+            errs,
+        )
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct LetExpr {
     pub var: String,
 }
@@ -98,21 +154,19 @@ impl ParseSynExpr for LetExpr {
     type SynExpr = ya_syn::LetExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
-        let errs = vec![];
-
         let var = expr.var.name.clone();
+        let ty = expr.ty.as_ref().map(|ty| ty.into());
 
         envs.envs
             .last_mut()
             .expect("No environment found").vars
-            .insert(var.clone(), None);
+            .insert(var.clone(), ty.clone());
 
-        Expr::new(
-            Type::Prim(PrimType::Unit),
+        Expr::new_ok(
+            ty.unwrap_or(Type::Prim(PrimType::Unit)),
             ExprKind::Let(Self {
                 var,
             }),
-            errs
         )
     }
 }
@@ -177,7 +231,7 @@ impl ParseSynExpr for LitExpr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct VarExpr {
     pub name: String,
 }
@@ -188,7 +242,9 @@ impl ParseSynExpr for VarExpr {
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         let mut errs = vec![];
 
-        let ty = envs.get_def_var(expr.name.as_str())
+        let ty = envs.get_const(expr.name.as_str())
+            .map(|c| &c.ty)
+            .or_else(|_| envs.get_def_var(expr.name.as_str()))
             .map_err(|err| errs.push(err))
             .map_or(Type::Prim(PrimType::Unit), |ty| ty.clone());
 
@@ -202,7 +258,7 @@ impl ParseSynExpr for VarExpr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BlockExpr {
     pub stmts: Vec<Expr>,
     pub expr: Option<Box<Expr>>,
@@ -212,6 +268,34 @@ impl ParseSynExpr for BlockExpr {
     type SynExpr = ya_syn::BlockExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+        // parse constant variable and types first
+        let consts = expr.stmts
+            .iter()
+            .flat_map(|stmt| stmt.find_all_curr_scope(|expr| {
+                // find constant definitions
+                match expr {
+                    ya_syn::Expr::Const(ya_syn::ConstExpr { .. }) => true,
+                    _ => false,
+                }
+            }))
+            .map(|expr| {
+                Expr::parse(envs, expr);
+                match expr {
+                    ya_syn::Expr::Const(expr) => expr,
+                    _ => unreachable!(),
+                }
+            })
+            .collect::<Vec<_>>();
+        
+        for expr in consts {
+            envs.envs
+                .last_mut()
+                .expect("Cannot find environment")
+                .get_const_mut(expr.var.name.as_str())
+                .expect("Cannot find constant")
+                .expr = Expr::parse(envs, &expr.expr);
+        }
+
         let stmts = expr.stmts
             .iter()
             .map(|stmt| Expr::parse(envs, stmt))
@@ -235,7 +319,7 @@ impl ParseSynExpr for BlockExpr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TupleExpr {
     pub items: Vec<Expr>,
 }
@@ -244,8 +328,6 @@ impl ParseSynExpr for TupleExpr {
     type SynExpr = ya_syn::TupleExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
-        let errs = vec![];
-
         let items = expr.items
             .iter()
             .map(|item| Expr::parse(envs, item))
@@ -256,17 +338,16 @@ impl ParseSynExpr for TupleExpr {
             .map(|item| item.ty.clone())
             .collect());
 
-        Expr::new(
+        Expr::new_ok(
             ty,
             ExprKind::Tuple(Self {
                 items,
             }),
-            errs,
         )
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CallExpr {
     pub callee: Box<Expr>,
     pub args: Vec<Expr>,
@@ -285,6 +366,7 @@ impl ParseSynExpr for CallExpr {
 
         let callee = Box::new(Expr::parse(envs, &*expr.callee));
 
+        // check arguments
         match &callee.as_ref().ty {
             Type::Func(ty) => {
                 ty.params
@@ -326,7 +408,7 @@ impl ParseSynExpr for CallExpr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BinOpExpr {
     pub op: String,
     pub lhs: Box<Expr>,
@@ -378,18 +460,30 @@ impl ParseSynExpr for BinOpExpr {
                     // special case: $let_expr = $rhs
                     // initialize the var in $let_expr with $rhs
                     match (&mut operands[idx..idx + 2], curr_op.op.op.as_str()) {
-                        ([Some(lhs @ Expr { kind: ExprKind::Let(_), .. }), Some(rhs)], "=") => {
+                        ([
+                            Some(lhs @ Expr {
+                                kind: ExprKind::Let(_),
+                                ..
+                            }),
+                            Some(rhs),
+                        ], "=") => {
                             lhs.ty = rhs.ty.clone();
 
-                            if let ExprKind::Let(ref mut let_expr) = lhs.kind {
-                                *envs.envs
-                                    .last_mut()
-                                    .unwrap()
-                                    .vars
-                                    .iter_mut()
-                                    .find(|(name, _)| **name == let_expr.var)
-                                    .expect("Cannot find variable in env for the $let_expr = $rhs")
-                                    .1 = Some(rhs.ty.clone());
+                            match &mut lhs.kind {
+                                ExprKind::Let(ref mut let_expr) => {
+                                    match envs.get_var_mut(let_expr.var.as_str()) {
+                                        Ok(ty) => match ty {
+                                            Some(ty) if rhs.ty == *ty => {},
+                                            Some(ty) => errs.push(Error::AssignmentMismatchedOperandTypes {
+                                                lhs: ty.clone(),
+                                                rhs: rhs.ty.clone()
+                                            }),
+                                            None => *ty = Some(rhs.ty.clone()),
+                                        },
+                                        Err(err) => errs.push(err),
+                                    }
+                                },
+                                _ => {},
                             }
 
                             op_flat_infos.push(OpFlatInfo {
@@ -512,7 +606,7 @@ impl From<ya_syn::UnOpPos> for UnOpPos {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UnOpExpr {
     pub op: char,
     pub op_pos: UnOpPos,
@@ -549,7 +643,7 @@ impl ParseSynExpr for UnOpExpr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct FuncExpr {
     pub id: usize,
 }

@@ -12,7 +12,7 @@ pub mod env;
 pub use expr::*;
 pub use env::*;
 
-#[derive(Error, Debug, PartialEq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Error {
     #[error("Global variable {var} not defined")]
     GlobalVarNotDefined { var: String },
@@ -29,6 +29,9 @@ pub enum Error {
     #[error("Expected callable, found {found:?}")]
     ExpectedCallable { found: Type },
 
+    #[error("Expected keyword `{expected}`, found `{found}`")]
+    ExpectedKeyword { expected: String, found: String },
+
     #[error("Mismatched argument type: expected {expected:?}, found {found:?}")]
     MismatchedArgument { expected: Option<Type>, found: Option<Type> },
 
@@ -37,6 +40,9 @@ pub enum Error {
 
     #[error("Variable not found {var}")]
     VarNotFound { var: String },
+
+    #[error("Constant not found {c}")]
+    ConstNotFound { c: String },
 
     #[error("Type not found {ty}")]
     TypeNotFound { ty: String },
@@ -52,6 +58,9 @@ pub enum Error {
 
     #[error("Undefined variable {var}")]
     UndefVar { var: String },
+
+    #[error("Expected global item `const`, found {found}")]
+    ExpectedGlobalItem { found: String },
 }
 
 /// The semantic parser.
@@ -71,13 +80,38 @@ impl Parser {
         };
         let mut items = vec![];
 
-        // first scan: global items
-        for item in syn_items {
-            match item {
-                ya_syn::Item::Let(expr) => {
-                    items.push(Expr::parse(&mut global, expr));
+        // first scan: parse declarations
+        let item_decls = syn_items
+            .iter()
+            .map(|item| match item {
+                    ya_syn::Item::Const(expr @ ya_syn::Expr::Const(ya_syn::ConstExpr { expr: rhs, .. })) => {
+                        Some((Expr::parse(&mut global, expr), &**rhs))
+                    },
+                    ya_syn::Item::Eof => None,
+                    _ => unreachable!(),
                 }
-                ya_syn::Item::Eof => {},
+            )
+            .collect::<Vec<_>>();
+
+        // second scan: parse definitions
+        for item in item_decls {
+            match item {
+                Some((Expr {
+                    ty,
+                    kind: ExprKind::Const(const_expr),
+                    errs,
+                    env
+                }, rhs))  => {
+                    global.envs
+                        .last_mut()
+                        .expect("Cannot find environment")
+                        .get_const_mut(const_expr.var.as_str())
+                        .expect("Cannot find constant")
+                        .expr = Expr::parse(&mut global, rhs);
+                    items.push(Expr { ty, kind: ExprKind::Const(const_expr), errs, env });
+                },
+                None => {},
+                _ => unimplemented!(),
             }
         }
 

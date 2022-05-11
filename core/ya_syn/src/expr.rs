@@ -2,6 +2,9 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
+    /** const: const $var_name $[: $type_name] = $expr */
+    Const(ConstExpr),
+
     /** let: let $var_name $[: $type_name]? */
     Let(LetExpr),
 
@@ -96,6 +99,9 @@ impl Expr {
 
     pub fn parse_prim(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         match lexer.peek_token() {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { raw }, .. }) if raw.as_str() == "const" => {
+                Ok(Self::Const(ConstExpr::parse(lexer)?))
+            },
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { raw }, .. }) if raw.as_str() == "let" => {
                 Ok(Self::Let(LetExpr::parse(lexer)?))
             },
@@ -143,6 +149,24 @@ impl Expr {
             _ => {
                 Err(Error::ExpectedExpr { found: format!("{:?}", lexer.next_token()?) })
             },
+        }
+    }
+    
+    /// find all the expressions satisfying the predicate in the current scope,
+    /// i.e. not including expressions inside `{}`, `()`.
+    pub fn find_all_curr_scope(&self, pred: fn(&Expr) -> bool) -> Vec<&Expr> {
+        if pred(self) {
+            vec![self]
+        } else {
+            match self {
+                Self::BinOp(bin) => {
+                    let mut v = bin.lhs.find_all_curr_scope(pred);
+                    v.append(&mut bin.rhs.find_all_curr_scope(pred));
+                    v
+                },
+                Self::UnOp(un) => un.expr.find_all_curr_scope(pred),
+                _ => vec![],
+            }
         }
     }
 }
@@ -213,6 +237,34 @@ impl TupleExpr {
         })?.inner.items;
 
         Ok(Self { items })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ConstExpr {
+    pub var: token::VarName,
+    pub ty: Option<token::TypeName>,
+    pub expr: Box<Expr>,
+}
+
+impl ConstExpr {
+    pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
+        token::Keyword::parse(lexer, &["const"])?;
+        let var = token::VarName::parse(lexer)?;
+
+        let ty = match lexer.peek_token() {
+            Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Operator { raw }, .. }) if raw.as_str() == ":" => {
+                lexer.next_token()?;
+                Some(token::TypeName::parse(lexer)?)
+            },
+            _ => None,
+        };
+
+        token::Operator::parse_with(lexer, &["="])?;
+
+        let expr = Box::new(Expr::parse(lexer)?);
+
+        Ok(Self { var, ty, expr })
     }
 }
 

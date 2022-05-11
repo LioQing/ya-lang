@@ -1,11 +1,12 @@
 use super::*;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Env {
     pub tys: HashMap<String, Type>,
     pub vars: HashMap<String, Option<Type>>,
     pub bin_ops: HashMap<BinOp, OpInfo>,
     pub un_ops: HashMap<UnOp, Type>,
+    pub consts: HashMap<String, ConstInfo>,
 }
 
 impl Env {
@@ -27,12 +28,24 @@ impl Env {
             .ok_or(Error::VarNotFound { var: var.to_owned() })
     }
 
-    pub fn get_decl_var(&self, var: &str) -> Result<&Type, Error> {
+    pub fn get_def_var(&self, var: &str) -> Result<&Type, Error> {
         match self.get_var(var) {
             Ok(Some(ty)) => Ok(ty),
             Ok(None) => Err(Error::UndefVar { var: var.to_owned() }),
             Err(err) => Err(err),
         }
+    }
+
+    pub fn get_const(&self, c: &str) -> Result<&ConstInfo, Error> {
+        self.consts
+            .get(c)
+            .ok_or(Error::ConstNotFound { c: c.to_owned() })
+    }
+
+    pub fn get_const_mut(&mut self, c: &str) -> Result<&mut ConstInfo, Error> {
+        self.consts
+            .get_mut(c)
+            .ok_or(Error::ConstNotFound { c: c.to_owned() })
     }
 
     // Issue #2
@@ -80,7 +93,7 @@ impl Env {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct EnvStack {
     pub envs: Vec<Env>,
     pub funcs: Vec<Expr>,
@@ -126,6 +139,28 @@ impl EnvStack {
             Ok(None) => Err(Error::UndefVar { var: var.to_owned() }),
             Err(err) => Err(err),
         }
+    }
+
+    pub fn get_const(&self, c: &str) -> Result<&ConstInfo, Error> {
+        self.envs
+            .iter()
+            .rev()
+            .find_map(|env| match env.get_const(c) {
+                Ok(c) => Some(c),
+                Err(_) => None,
+            })
+            .ok_or(Error::ConstNotFound { c: c.to_owned() })
+    }
+
+    pub fn get_const_mut(&mut self, c: &str) -> Result<&mut ConstInfo, Error> {
+        self.envs
+            .iter_mut()
+            .rev()
+            .find_map(|env| match env.get_const_mut(c) {
+                Ok(c) => Some(c),
+                Err(_) => None,
+            })
+            .ok_or(Error::ConstNotFound { c: c.to_owned() })
     }
 
     // Issue #2
@@ -360,4 +395,10 @@ impl OpInfo {
             func_id: None,
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ConstInfo {
+    pub ty: Type,
+    pub expr: Expr,
 }

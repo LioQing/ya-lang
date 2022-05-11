@@ -2,16 +2,13 @@ use super::*;
 
 #[test]
 fn empty_func() {
-    let parser = Parser::parse("let main = () {}");
+    let parser = Parser::parse("const main = () {}");
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
-        op: token::Operator { op: "=".to_owned() },
-        lhs: Box::new(Expr::Let(LetExpr {
-            var: token::VarName { name: "main".to_owned() },
-            ty: None,
-        })),
-        rhs: Box::new(Expr::Func(FuncExpr {
+    assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
+        ty: None,
+        var: token::VarName { name: "main".to_owned() },
+        expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::TypeName::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
@@ -25,19 +22,16 @@ fn empty_func() {
 #[test]
 fn hello_world_func() {
     let parser = Parser::parse(r#"
-    let hello_world = () {
+    const hello_world = () {
         println("Hello World!");
     }
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
-        op: token::Operator { op: "=".to_owned() },
-        lhs: Box::new(Expr::Let(LetExpr {
-            var: token::VarName { name: "hello_world".to_owned() },
-            ty: None,
-        })),
-        rhs: Box::new(Expr::Func(FuncExpr {
+    assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
+        ty: None,
+        var: token::VarName { name: "hello_world".to_owned() },
+        expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::TypeName::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
@@ -63,20 +57,17 @@ fn hello_world_func() {
 #[test]
 fn add_i32_func() {
     let parser = Parser::parse(r#"
-    let add = (a: i32, b: i32) -> i32 {
+    const add = (a: i32, b: i32) -> i32 {
         println(f"Adding {} and {}", a, b);
         a + b
     }
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
-        op: token::Operator { op: "=".to_owned() },
-        lhs: Box::new(Expr::Let(LetExpr {
-            var: token::VarName { name: "add".to_owned() },
-            ty: None,
-        })),
-        rhs: Box::new(Expr::Func(FuncExpr {
+    assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
+        ty: None,
+        var: token::VarName { name: "add".to_owned() },
+        expr: Box::new(Expr::Func(FuncExpr {
             params: vec![
                 VarTypeDecl {
                     name: token::VarName { name: "a".to_owned() },
@@ -117,20 +108,17 @@ fn add_i32_func() {
 #[test]
 fn extreme_empty_func() {
     let parser = Parser::parse(r#"
-    let main = () -> () {
+    const main = () -> () {
         ;;;;a;;;;
         b
     }
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
-        op: token::Operator { op: "=".to_owned() },
-        lhs: Box::new(Expr::Let(LetExpr {
-            var: token::VarName { name: "main".to_owned() },
-            ty: None,
-        })),
-        rhs: Box::new(Expr::Func(FuncExpr {
+    assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
+        ty: None,
+        var: token::VarName { name: "main".to_owned() },
+        expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::TypeName::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {
@@ -144,7 +132,7 @@ fn extreme_empty_func() {
 #[test]
 fn func_params_ret_and_let_expr() {
     let parser = Parser::parse(r#"
-    let main = (argc: i32, argv: u8) -> bool {
+    const main = (argc: i32, argv: u8) -> bool {
         let a;
         let b: i32;
         let a = b;
@@ -153,13 +141,10 @@ fn func_params_ret_and_let_expr() {
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
-        op: token::Operator { op: "=".to_owned() },
-        lhs: Box::new(Expr::Let(LetExpr {
-            var: token::VarName { name: "main".to_owned() },
-            ty: None,
-        })),
-        rhs: Box::new(Expr::Func(FuncExpr {
+    assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
+        ty: None,
+        var: token::VarName { name: "main".to_owned() },
+        expr: Box::new(Expr::Func(FuncExpr {
             params: vec![
                 VarTypeDecl {
                     name: token::VarName { name: "argc".to_owned() },
@@ -207,19 +192,16 @@ fn func_params_ret_and_let_expr() {
 #[test]
 fn tuple_and_unit() {
     let parser = Parser::parse(r#"
-    let main = () -> (i32, ((), i64)) {
+    const main = () -> (i32, ((), i64)) {
         (a + b, ((), 2i64))
     }
     "#);
 
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
-        op: token::Operator { op: "=".to_owned() },
-        lhs: Box::new(Expr::Let(LetExpr {
-            var: token::VarName { name: "main".to_owned() },
-            ty: None,
-        })),
-        rhs: Box::new(Expr::Func(FuncExpr {
+    assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
+        ty: None,
+        var: token::VarName { name: "main".to_owned() },
+        expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::TypeName::Tuple(vec![
                 token::TypeName::PrimType(PrimType::I32),
@@ -258,7 +240,7 @@ fn tuple_and_unit() {
 #[test]
 fn unary_operators() {
     let parser = Parser::parse(r#"
-    let main = () {
+    const main = () {
         &1- +- +2*;
     
         &1- + -+2*;
@@ -277,13 +259,10 @@ fn unary_operators() {
     "#);
     
     assert_eq!(parser.items.len(), 1);
-    assert_eq!(parser.items[0], Item::Let(Expr::BinOp(BinOpExpr {
-        op: token::Operator { op: "=".to_owned() },
-        lhs: Box::new(Expr::Let(LetExpr {
-            var: token::VarName { name: "main".to_owned() },
-            ty: None,
-        })),
-        rhs: Box::new(Expr::Func(FuncExpr {
+    assert_eq!(parser.items[0], Item::Const(Expr::Const(ConstExpr {
+        ty: None,
+        var: token::VarName { name: "main".to_owned() },
+        expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::TypeName::PrimType(PrimType::Unit),
             body: Box::new(BlockExpr {

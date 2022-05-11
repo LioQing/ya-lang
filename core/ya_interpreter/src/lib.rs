@@ -51,6 +51,11 @@ pub fn run() {
 
     let syn_parser = ya_syn::Parser::parse(&src);
 
+    if !syn_parser.errs.is_empty() {
+        println!("{:#?}", syn_parser.errs);
+        return;
+    }
+
     let sem_parser = ya_sem::Parser::parse(
         &syn_parser.items,
         ya_sem::Env {
@@ -58,28 +63,22 @@ pub fn run() {
             vars: HashMap::new(),
             bin_ops,
             un_ops,
+            consts: HashMap::new(),
         }
     );
 
     println!("env: {:#?}", sem_parser.global_env);
     println!("items: {:#?}", sem_parser.items);
 
-    let main = sem_parser.items
+    let main = sem_parser.global_env.envs
+        .first()
+        .expect("Cannot find environment")
+        .consts
         .iter()
-        .find_map(|item| match item {
-            ya_sem::Expr {
-                kind: ya_sem::ExprKind::BinOp(ya_sem::BinOpExpr {
-                    op,
-                    lhs,
-                    rhs,
-                }),
-                ..
-            } if op.as_str() == "=" => {
-                match (lhs.as_ref(), rhs.as_ref()) {
-                    (
-                        ya_sem::Expr { kind: ya_sem::ExprKind::Let(ya_sem::LetExpr { var }), .. },
-                        ya_sem::Expr { kind: ya_sem::ExprKind::Func(ya_sem::FuncExpr { id }), .. },
-                    ) if var.as_str() == "main" => {
+        .find_map(|(var, info)| match var.as_str() {
+            "main" => {
+                match &info.expr {
+                    ya_sem::Expr { kind: ya_sem::ExprKind::Func(ya_sem::FuncExpr { id }), .. } => {
                         Some(&sem_parser.global_env.funcs[*id])
                     },
                     _ => None,

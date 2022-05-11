@@ -4,6 +4,7 @@ use super::*;
 #[strum(serialize_all = "snake_case")]
 pub enum Keyword {
     Let,
+    Const,
 }
 
 impl Keyword {
