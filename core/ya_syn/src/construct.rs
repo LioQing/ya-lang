@@ -129,51 +129,57 @@ macro_rules! separated_parse {
             }
         })
     };
-    ($l:ident; $r:expr; $s:expr; allow_empty; allow_trailing; $($t:pat)?) => {
-        loop {
+    ($l:ident; $r:expr; $s:expr; allow_empty; allow_trailing; $($t:pat)?) => {{
+        let ret: Option<Separated<Expr>> = loop {
             match $l.peek_token()? {
                 ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into() => {
                     $l.next_token().unwrap();
                 },
                 $($t => {
-                    return Ok(Separated {
+                    break Some(Separated {
                         separator: $s,
                         items: vec![],
                         is_trailing: true,
-                    })
+                        errs: vec![],
+                    });
                 },)?
                 _ => {
-                    break;
+                    break None;
                 },
             }
-        }
+        };
 
-        Separated::parse($l, $s, |$l| {
-            separated_helper! {
-                $l;
-                {
-                    let r = $r;
-                    
-                    if matches!(
-                        $l.peek_token()?,
-                        ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into()
-                     ) {
-                        while let ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } = $l.peek_nth_token(1)? {
-                            if *raw == $s.into() {
-                                $l.next_token().unwrap();
-                            } else {
-                                break;
+        match ret {
+            Some(sep) => sep,
+            None => {
+                Separated::parse($l, $s, |$l| {
+                    separated_helper! {
+                        $l;
+                        {
+                            let r = $r;
+                            
+                            if matches!(
+                                $l.peek_token()?,
+                                ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } if *raw == $s.into()
+                             ) {
+                                while let ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } = $l.peek_nth_token(1)? {
+                                    if *raw == $s.into() {
+                                        $l.next_token().unwrap();
+                                    } else {
+                                        break;
+                                    }
+                                }
                             }
-                        }
+        
+                            r
+                        };
+                        allow_trailing @ $s;
+                        stop @ $($t)?
                     }
-
-                    r
-                };
-                allow_trailing @ $s;
-                stop @ $($t)?
+                })
             }
-        })
-    };
+        }
+    }};
 }
 
 pub(super) use separated_parse;
@@ -183,6 +189,7 @@ pub struct Separated<T> {
     pub separator: token::Separator,
     pub items: Vec<T>,
     pub is_trailing: bool,
+    pub errs: Vec<Error>,
 }
 
 impl<T> Separated<T> {
@@ -191,35 +198,40 @@ impl<T> Separated<T> {
             separator,
             items: vec![],
             is_trailing: false,
+            errs: vec![],
         }
     }
 
-    pub fn parse<F>(lexer: &mut ya_lexer::Lexer, sep: token::Separator, parse: F) -> Result<Self, Error>
+    pub fn parse<F>(lexer: &mut ya_lexer::Lexer, sep: token::Separator, parse: F) -> Self
     where
         F: Fn(&mut ya_lexer::Lexer) -> Result<SepRes<T>, Error>
     {
-        let mut items = Vec::new();
+        let mut errs = vec![];
+        let mut items = vec![];
 
         let is_trailing = loop {
-            match parse(lexer)? {
-                SepRes::Cont { item } => items.push(item),
-                SepRes::Stop { item, is_trailing } => {
+            match parse(lexer) {
+                Ok(SepRes::Cont { item }) => items.push(item),
+                Ok(SepRes::Stop { item, is_trailing }) => {
                     items.push(item);
                     break is_trailing;
-                }
+                },
+                Err(e) => errs.push(e),
             }
 
-            match lexer.next_token()? {
-                ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. } if raw == sep.into() => {},
-                found => return Err(Error::ExpectedSeparator { expected: sep.into(), found }),
+            match lexer.next_token() {
+                Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Separator { raw }, .. }) if raw == sep.into() => {},
+                Ok(found) => errs.push(Error::ExpectedSeparator { expected: sep.into(), found }),
+                Err(e) => errs.push(e.into()),
             }
         };
 
-        Ok(Self {
+        Self {
             items,
             separator: sep,
             is_trailing,
-        })
+            errs,
+        }
     }
 }
 

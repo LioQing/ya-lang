@@ -52,21 +52,26 @@ impl Type {
     pub fn parse(lexer: &mut ya_lexer::Lexer) -> Result<Self, Error> {
         match lexer.peek_token()? {
             ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: '(', .. }, .. } => {
-                let tys = Bracketed::parse(lexer, &[Bracket::Round], |lexer| {
+                let seps = Bracketed::parse(lexer, &[Bracket::Round], |lexer| {
                     allow_empty_bracket! {
                         lexer;
                         Separated::new(token::Separator::Comma);
                         token::Bracket::Round
                     };
         
-                    separated_parse! {
+                    Ok(separated_parse! {
                         lexer;
                         Self::parse(lexer)?;
                         token::Separator::Comma;
                         allow_trailing;
                         ya_lexer::Token { kind: ya_lexer::TokenKind::Bracket { raw: ')', .. }, .. }
-                    }
-                })?.inner.items;
+                    })
+                })?.inner;
+
+                if !seps.errs.is_empty() {
+                    return Err(seps.errs[0].clone());
+                }
+                let tys = seps.items;
 
                 match tys.as_slice() {
                     [] => Ok(Self::PrimType(PrimType::Unit)),

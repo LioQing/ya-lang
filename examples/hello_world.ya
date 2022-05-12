@@ -1,5 +1,6 @@
 const main = () {
-    println();
+    println()
+    const println = () {};
 
     6f32 + 5f32 * 4f32 / 3f32 - 2f32 % 1f32
 }

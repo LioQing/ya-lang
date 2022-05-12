@@ -14,6 +14,9 @@ pub use env::*;
 
 #[derive(Error, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Error {
+    #[error("{0}")]
+    Syntax(#[from] ya_syn::Error),
+
     #[error("Global symbol {symbol} not defined")]
     GlobalVarNotDefined { symbol: String },
 
@@ -93,8 +96,7 @@ impl Parser {
                     })) => {
                         Some((ConstExpr::parse_decl(&mut global, expr), &**rhs))
                     },
-                    ya_syn::Item::Eof => None,
-                    _ => unreachable!(),
+                    _ => None,
                 }
             )
             .collect::<Vec<_>>();

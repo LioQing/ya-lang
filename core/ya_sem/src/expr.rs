@@ -81,6 +81,11 @@ impl ParseSynExpr for Expr {
             ya_syn::Expr::BinOp(expr) => BinOpExpr::parse(envs, expr),
             ya_syn::Expr::UnOp(expr) => UnOpExpr::parse(envs, expr),
             ya_syn::Expr::Func(expr) => FuncExpr::parse(envs, expr),
+            ya_syn::Expr::Err(errs) => Expr::new(
+                Type::Prim(PrimType::Unit),
+                ExprKind::Block(BlockExpr { stmts: vec![], expr: None }),
+                Vec::from_iter(errs.into_iter().map(|err| Error::Syntax(err.clone().into())))
+            ),
         }
     }
 }
@@ -666,6 +671,8 @@ impl ParseSynExpr for FuncExpr {
     type SynExpr = ya_syn::FuncExpr;
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
+        let mut errs = vec![];
+
         let ty = Type::Func(expr.into());
 
         let vars = expr.params
@@ -673,14 +680,27 @@ impl ParseSynExpr for FuncExpr {
             .map(|param| (param.name.name.clone(), Some((&param.ty).into())))
             .collect::<HashMap<_, _>>();
         
-        let func = BlockExpr::parse_with_local_vars(envs, expr.body.as_ref(), vars);
+        let empty_block_expr = ya_syn::BlockExpr { stmts: vec![], expr: None, sep_errs: vec![] };
+        let func = BlockExpr::parse_with_local_vars(
+            envs,
+            match expr.body.as_ref() {
+                ya_syn::Expr::Block(expr) => expr,
+                ya_syn::Expr::Err(err) => {
+                    errs.extend(err.clone().into_iter().map(|err| Error::Syntax(err.into())));
+                    &empty_block_expr
+                },
+                _ => unreachable!(),
+            },
+            vars
+        );
         envs.funcs.push(func);
 
-        Expr::new_ok(
+        Expr::new(
             ty,
             ExprKind::Func(FuncExpr {
                 id: envs.funcs.len() - 1,
             }),
+            errs,
         )
     }
 }

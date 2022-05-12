@@ -5,7 +5,7 @@ use std::ops::Range;
 #[cfg(test)]
 mod tests;
 
-#[derive(Error, Debug, PartialEq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Error {
     #[error("No open bracket found for closing bracket `{close}`")]
     NoOpeningBracket { close: char },
@@ -26,7 +26,7 @@ pub enum Error {
     UnknownSymbol { symbol: String },
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Span {
     pub line: usize,
     pub col_range: Range<usize>,
@@ -34,13 +34,13 @@ pub struct Span {
     pub dist_from_prev: usize,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum TokenKind {
     /** end of the source code */
     Eof,
@@ -73,13 +73,13 @@ impl TokenKind {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum BracketKind {
     Open,
     Close,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum NumericKind {
     Integer,
     Float { dot_pos: Option<usize>, exp_pos: Option<usize> },

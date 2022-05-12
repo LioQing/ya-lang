@@ -11,10 +11,12 @@ fn empty_func() {
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::Type::PrimType(PrimType::Unit),
-            body: Box::new(BlockExpr {
+            body: Box::new(Expr::Block(BlockExpr {
                 stmts: vec![],
                 expr: None,
-            }),
+                sep_errs: vec![],
+            })),
+            sep_errs: vec![],
         })),
     })));
 }
@@ -34,7 +36,7 @@ fn hello_world_func() {
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::Type::PrimType(PrimType::Unit),
-            body: Box::new(BlockExpr {
+            body: Box::new(Expr::Block(BlockExpr {
                 stmts: vec![
                     Expr::Call(CallExpr {
                         callee: Box::new(Expr::Symbol(token::Symbol { name: "println".to_owned() })),
@@ -49,7 +51,9 @@ fn hello_world_func() {
                     }),
                 ],
                 expr: None,
-            }),
+                sep_errs: vec![],
+            })),
+            sep_errs: vec![],
         })),
     })));
 }
@@ -79,7 +83,7 @@ fn add_i32_func() {
                 },
             ],
             ret_ty: token::Type::PrimType(PrimType::I32),
-            body: Box::new(BlockExpr {
+            body: Box::new(Expr::Block(BlockExpr {
                 stmts: vec![
                     Expr::Call(CallExpr {
                         callee: Box::new(Expr::Symbol(token::Symbol { name: "println".to_owned() })),
@@ -100,7 +104,9 @@ fn add_i32_func() {
                     lhs: Box::new(Expr::Symbol(token::Symbol { name: "a".to_owned() })),
                     rhs: Box::new(Expr::Symbol(token::Symbol { name: "b".to_owned() })),
                 }))),
-            }),
+                sep_errs: vec![],
+            })),
+            sep_errs: vec![],
         })),
     })));
 }
@@ -121,10 +127,12 @@ fn extreme_empty_func() {
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::Type::PrimType(PrimType::Unit),
-            body: Box::new(BlockExpr {
+            body: Box::new(Expr::Block(BlockExpr {
                 stmts: vec![Expr::Symbol(token::Symbol { name: "a".to_owned() })],
                 expr: Some(Box::new(Expr::Symbol(token::Symbol { name: "b".to_owned() }))),
-            }),
+                sep_errs: vec![],
+            })),
+            sep_errs: vec![],
         })),
     })));
 }
@@ -156,7 +164,7 @@ fn func_params_ret_and_let_expr() {
                 },
             ],
             ret_ty: token::Type::PrimType(PrimType::Bool),
-            body: Box::new(BlockExpr {
+            body: Box::new(Expr::Block(BlockExpr {
                 stmts: vec![
                     Expr::Let(LetExpr {
                         symbol: token::Symbol { name: "a".to_owned() },
@@ -184,7 +192,9 @@ fn func_params_ret_and_let_expr() {
                     }),
                 ],
                 expr: None,
-            }),
+                sep_errs: vec![],
+            })),
+            sep_errs: vec![],
         })),
     })));
 }
@@ -210,7 +220,7 @@ fn tuple_and_unit() {
                     token::Type::PrimType(PrimType::I64),
                 ]),
             ]),
-            body: Box::new(BlockExpr {
+            body: Box::new(Expr::Block(BlockExpr {
                 stmts: vec![],
                 expr: Some(Box::new(Expr::Tuple(TupleExpr {
                     items: vec![
@@ -221,7 +231,7 @@ fn tuple_and_unit() {
                         }),
                         Expr::Tuple(TupleExpr {
                             items: vec![
-                                Expr::Tuple(TupleExpr { items: vec![] }),
+                                Expr::Tuple(TupleExpr { items: vec![], sep_errs: vec![] }),
                                 Expr::Lit(token::Lit {
                                     value: "2".to_owned(),
                                     prefix: "".to_owned(),
@@ -229,10 +239,14 @@ fn tuple_and_unit() {
                                     kind: token::LitKind::Integer,
                                 }),
                             ],
+                            sep_errs: vec![],
                         }),
                     ],
+                    sep_errs: vec![],
                 }))),
-            }),
+                sep_errs: vec![],
+            })),
+            sep_errs: vec![],
         }))
     })));
 }
@@ -265,7 +279,7 @@ fn unary_operators() {
         expr: Box::new(Expr::Func(FuncExpr {
             params: vec![],
             ret_ty: token::Type::PrimType(PrimType::Unit),
-            body: Box::new(BlockExpr {
+            body: Box::new(Expr::Block(BlockExpr {
                 stmts: vec![
                     Expr::BinOp(
                         BinOpExpr {
@@ -668,7 +682,9 @@ fn unary_operators() {
                     ),
                 ],
                 expr: None,
-            }),
+                sep_errs: vec![],
+            })),
+            sep_errs: vec![],
         }))
     })));
 }

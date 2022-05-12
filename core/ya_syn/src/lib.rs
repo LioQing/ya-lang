@@ -15,7 +15,7 @@ pub use expr::*;
 pub use construct::*;
 pub use item::*;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Error {
     #[error("{0}")]
     Lexer(#[from] ya_lexer::Error),
@@ -66,23 +66,20 @@ pub enum Error {
 /// Parse the tokens from lexer into a parse tree.
 pub struct Parser {
     pub items: Vec<Item>,
-    pub errs: Vec<Error>,
 }
 
 impl Parser {
     pub fn parse(src: &str) -> Self {
         let mut lexer = ya_lexer::Lexer::new(src);
         let mut items = vec![];
-        let mut errs = vec![];
 
         loop {
             match Item::parse(&mut lexer) {
-                Ok(Item::Eof) => break,
-                Err(e) => errs.push(e),
-                Ok(i) => items.push(i),
+                Item::Eof => break,
+                i => items.push(i),
             }
         }
 
-        Self { items, errs }
+        Self { items }
     }
 }

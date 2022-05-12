@@ -58,10 +58,7 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
 
     let syn_parser = ya_syn::Parser::parse(&src);
 
-    if !syn_parser.errs.is_empty() {
-        println!("{:#?}", syn_parser.errs);
-        return;
-    }
+    println!("{:#?}", syn_parser.items);
 
     let sem_parser = ya_sem::Parser::parse(
         &syn_parser.items,
@@ -74,7 +71,7 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
         }
     );
 
-    println!("env: {:#?}", sem_parser.global_env);
+    println!("funcs: {:#?}", sem_parser.global_env.funcs);
     println!("items: {:#?}", sem_parser.items);
 
     let main = sem_parser.global_env.envs
