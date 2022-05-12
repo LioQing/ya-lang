@@ -4,8 +4,8 @@ use super::*;
 pub struct Env {
     pub tys: HashMap<String, Type>,
     pub vars: HashMap<String, Option<Type>>,
-    pub bin_ops: HashMap<BinOp, OpInfo>,
-    pub un_ops: HashMap<UnOp, Type>,
+    pub bin_ops: HashMap<BinOp, BinOpInfo>,
+    pub un_ops: HashMap<UnOp, UnOpInfo>,
     pub consts: HashMap<String, ConstInfo>,
 }
 
@@ -49,12 +49,12 @@ impl Env {
     }
 
     // Issue #2
-    pub fn get_bin_op(&self, bin_op: &BinOp) -> Result<OpInfo, Error> {
+    pub fn get_bin_op(&self, bin_op: &BinOp) -> Result<BinOpInfo, Error> {
         match bin_op.op.as_str() {
             // special case: "=" operator
             "=" => match bin_op.lhs.eq(&bin_op.rhs) {
                 true => {
-                    Ok(OpInfo::new(bin_op.lhs.clone(), 0x0))
+                    Ok(BinOpInfo::new_builtin(bin_op.lhs.clone(), 0x0))
                 },
                 false => {
                     Err(Error::AssignmentMismatchedOperandTypes {
@@ -76,7 +76,7 @@ impl Env {
         }
     }
 
-    pub fn get_un_op(&self, un_op: &UnOp) -> Result<Type, Error> {
+    pub fn get_un_op(&self, un_op: &UnOp) -> Result<UnOpInfo, Error> {
         self.un_ops
             .get(un_op)
             .map(|op_info| op_info.clone())
@@ -164,7 +164,7 @@ impl EnvStack {
     }
 
     // Issue #2
-    pub fn get_bin_op(&self, bin_op: &BinOp) -> Result<OpInfo, Error> {
+    pub fn get_bin_op(&self, bin_op: &BinOp) -> Result<BinOpInfo, Error> {
         self.envs
             .iter()
             .rev()
@@ -179,7 +179,7 @@ impl EnvStack {
             })
     }
 
-    pub fn get_un_op(&self, un_op: &UnOp) -> Result<Type, Error> {
+    pub fn get_un_op(&self, un_op: &UnOp) -> Result<UnOpInfo, Error> {
         self.envs
             .iter()
             .rev()
@@ -386,19 +386,34 @@ pub enum OpAssoc {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct OpInfo {
+pub struct BinOpInfo {
     pub ty: Type,
     pub prec: OpPrec,
     pub assoc: OpAssoc,
     pub func_id: Option<usize>,
 }
 
-impl OpInfo {
-    pub fn new(ty: Type, prec: OpPrec) -> Self {
+impl BinOpInfo {
+    pub fn new_builtin(ty: Type, prec: OpPrec) -> Self {
         Self {
             ty,
             prec,
             assoc: [OpAssoc::Left, OpAssoc::Right][(prec as usize / 2) % 2],
+            func_id: None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct UnOpInfo {
+    pub ty: Type,
+    pub func_id: Option<usize>,
+}
+
+impl UnOpInfo {
+    pub fn new_builtin(ty: Type) -> Self {
+        Self {
+            ty,
             func_id: None,
         }
     }

@@ -8,7 +8,7 @@ macro_rules! bin_op_info {
     ($lhs:expr, $op:literal, $rhs:expr => $res:expr; $prec:literal) => {
         (
             ya_sem::BinOp { op: $op.to_owned(), lhs: $lhs, rhs: $rhs },
-            ya_sem::OpInfo::new($res, $prec),
+            ya_sem::BinOpInfo::new_builtin($res, $prec),
         )
     };
 }
@@ -35,13 +35,13 @@ macro_rules! un_op_info {
     ($op:literal, $ty:expr => $res:expr) => {
         (
             ya_sem::UnOp { op: $op, op_pos: ya_sem::UnOpPos::Pre, ty: $ty },
-            $res,
+            ya_sem::UnOpInfo { ty: $res, func_id: None },
         )
     };
     ($ty:expr, $op:literal => $res:expr) => {
         (
             ya_sem::UnOp { op: $op, op_pos: ya_sem::UnOpPos::Suf, ty: $ty },
-            $res,
+            ya_sem::UnOpInfo { ty: $res, func_id: None },
         )
     };
 }

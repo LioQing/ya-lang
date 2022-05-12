@@ -436,7 +436,7 @@ impl BinOpExpr {
         op: &String,
         lhs: &Expr,
         rhs: &Expr,
-    ) -> OpInfo {
+    ) -> BinOpInfo {
         let bin_op = BinOp {
             op: op.clone(),
             lhs: lhs.ty.clone(),
@@ -445,7 +445,7 @@ impl BinOpExpr {
 
         envs.get_bin_op(&bin_op)
             .map_err(|err| errs.push(err))
-            .unwrap_or(OpInfo::new(Type::Prim(PrimType::Unit), 0))
+            .unwrap_or(BinOpInfo::new_builtin(Type::Prim(PrimType::Unit), 0))
     }
 }
 
@@ -454,7 +454,7 @@ impl ParseSynExpr for BinOpExpr {
 
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr {
         struct OpFlatInfo {
-            info: OpInfo,
+            info: BinOpInfo,
             op: String,
             errs: Vec<Error>,
             lhs: usize,
@@ -501,7 +501,7 @@ impl ParseSynExpr for BinOpExpr {
                             }
 
                             op_flat_infos.push(OpFlatInfo {
-                                info: OpInfo::new(Type::Prim(PrimType::Unit), 0xf),
+                                info: BinOpInfo::new_builtin(Type::Prim(PrimType::Unit), 0xf),
                                 op: curr_op.op.op.clone(),
                                 errs,
                                 lhs: idx,
@@ -547,7 +547,7 @@ impl ParseSynExpr for BinOpExpr {
         fn resolve_prec(envs: &mut EnvStack, mut op_flat_infos: Vec<OpFlatInfo>, operands: &mut Vec<Option<Expr>>) -> Expr {
             if op_flat_infos.len() == 1 {
                 let OpFlatInfo { 
-                    info: OpInfo {
+                    info: BinOpInfo {
                         ty,
                         ..
                     },
@@ -643,7 +643,7 @@ impl ParseSynExpr for UnOpExpr {
             ty: expr.ty.clone(),
         })
         .map_err(|err| errs.push(err))
-        .map_or(Type::Prim(PrimType::Unit), |ty| ty.clone());
+        .map_or(Type::Prim(PrimType::Unit), |info| info.ty.clone());
 
         Expr::new(
             ty,
