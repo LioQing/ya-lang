@@ -20,6 +20,9 @@ pub enum Error {
     #[error("Invalid literal suffix {suffix}")]
     InvalidLiteralSuffix { suffix: String },
 
+    #[error("Radix prefix not supported for floating-point numeric literals")]
+    RadixPrefixNotSupportedForFloat,
+
     #[error("Conflicting types {type1:?} and {type2:?}")]
     ConflictingTypes { type1: Type, type2: Type },
 
@@ -103,14 +106,14 @@ impl Parser {
                     ty,
                     kind: ExprKind::Const(const_expr),
                     errs,
-                    env
+                    env,
                 }, rhs))  => {
                     global.envs
                         .last_mut()
                         .expect("Cannot find environment")
                         .get_const_mut(const_expr.symbol.as_str())
                         .expect("Cannot find constant")
-                        .expr = Expr::parse(&mut global, rhs);
+                        .rhs = Expr::parse(&mut global, rhs);
                     items.push(Expr { ty, kind: ExprKind::Const(const_expr), errs, env });
                 },
                 None => {},

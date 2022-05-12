@@ -19,11 +19,7 @@ fn empty_func() {
             un_ops: HashMap::new(),
             consts: [
                 ("main".to_owned(), ConstInfo {
-                    ty: Type::Func(FuncType {
-                        params: vec![],
-                        ret_ty: Box::new(Type::Prim(PrimType::Unit)),
-                    }),
-                    expr: Expr {
+                    rhs: Expr {
                         ty: Type::Func(FuncType {
                             params: vec![],
                             ret_ty: Box::new(Type::Prim(PrimType::Unit)),
@@ -34,6 +30,7 @@ fn empty_func() {
                         errs: vec![],
                         env: None,
                     },
+                    errs: vec![],
                 }),
             ].into(),
         }],

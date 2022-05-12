@@ -3,4 +3,6 @@ const main = () {
     const println = () -> i32 {
         1 + 1
     };
+
+    6f32 + 5f32 * 4f32 / 3f32 - 2f32 % 1f32
 }

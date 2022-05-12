@@ -225,10 +225,17 @@ impl Type {
                 Ok(Self::Prim(PrimType::F32))
             },
             ya_syn::token::Lit {
+                prefix,
                 suffix,
                 kind: kind @ (ya_syn::token::LitKind::Integer | ya_syn::token::LitKind::Float),
                 ..
             } => {
+                match (*kind, prefix.as_str()) {
+                    (ya_syn::token::LitKind::Float, "") => {},
+                    (ya_syn::token::LitKind::Integer, _) => {},
+                    _ => return Err(Error::RadixPrefixNotSupportedForFloat),
+                }
+
                 match (*kind, suffix.as_str()) {
                     (ya_syn::token::LitKind::Integer, "")    => Ok(Self::Prim(PrimType::I32)),
                     (ya_syn::token::LitKind::Float  , "")    => Ok(Self::Prim(PrimType::F32)),
@@ -399,6 +406,6 @@ impl OpInfo {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ConstInfo {
-    pub ty: Type,
-    pub expr: Expr,
+    pub rhs: Expr,
+    pub errs: Vec<Error>,
 }

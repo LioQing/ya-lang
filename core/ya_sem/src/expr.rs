@@ -56,7 +56,7 @@ impl Expr {
             ya_syn::Expr::Symbol(symbol) => Ok(
                 envs
                     .get_const(symbol.name.as_str())
-                    .map(|c| c.ty.clone())
+                    .map(|c| c.rhs.ty.clone())
                     .or_else(|_| envs
                         .get_def_var(symbol.name.as_str())
                         .map(|ty| ty.clone()))?
@@ -113,8 +113,8 @@ impl ConstExpr {
                 .last_mut()
                 .expect("No environment found").consts
                 .insert(symbol.clone(), ConstInfo {
-                    ty: expr.ty.clone(),
-                    expr: Expr::new_ok(Type::Prim(PrimType::Unit), ExprKind::Block(BlockExpr { stmts: vec![], expr: None })),
+                    rhs: Expr::new_ok(expr.ty.clone(), ExprKind::Block(BlockExpr { stmts: vec![], expr: None })),
+                    errs: expr.errs.clone(),
                 });
         } else {
             unreachable!();
@@ -255,7 +255,7 @@ impl ParseSynExpr for SymbolExpr {
         let mut errs = vec![];
 
         let ty = envs.get_const(expr.name.as_str())
-            .map(|c| &c.ty)
+            .map(|c| &c.rhs.ty)
             .or_else(|_| envs.get_def_var(expr.name.as_str()))
             .map_err(|err| errs.push(err))
             .map_or(Type::Prim(PrimType::Unit), |ty| ty.clone());
@@ -301,13 +301,13 @@ impl ParseSynExpr for BlockExpr {
             })
             .collect::<Vec<_>>();
         
-        for expr in consts {
+        for syn_expr in consts {
             envs.envs
                 .last_mut()
                 .expect("Cannot find environment")
-                .get_const_mut(expr.symbol.name.as_str())
+                .get_const_mut(syn_expr.symbol.name.as_str())
                 .expect("Cannot find constant")
-                .expr = Expr::parse(envs, &expr.expr);
+                .rhs = Expr::parse(envs, &syn_expr.expr);
         }
 
         let stmts = expr.stmts
