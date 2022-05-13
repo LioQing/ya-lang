@@ -1,20 +1,19 @@
-// lower number is higher priority
-/* 0 LTR */ "."
-/* 1 LTR */ 
-/* 2 RTL */ 
-/* 3 RTL */ 
-/* 4 LTR */ "*", "/", "%", "<<", ">>"
-/* 5 LTR */ "+", "-", "&", "|", "^"
-/* 6 RTL */ 
-/* 7 RTL */ 
-/* 8 LTR */ "<", "<=", ">", ">="
-/* 9 LTR */ "==", "!="
-/* a RTL */ 
-/* b RTL */ 
-/* c LTR */ "&&"
-/* d LTR */ "||"
-/* e RTL */ 
-/* f RTL */ "="
+/* f LTR */ "."
+/* e LTR */ 
+/* d RTL */ 
+/* c RTL */ 
+/* b LTR */ "*", "/", "%", "<<", ">>"
+/* a LTR */ "+", "-", "&", "|", "^"
+/* 9 RTL */ 
+/* 8 RTL */ 
+/* 7 LTR */ "<", "<=", ">", ">="
+/* 6 LTR */ "==", "!="
+/* 5 RTL */ 
+/* 4 RTL */ 
+/* 3 LTR */ "&&"
+/* 2 LTR */ "||"
+/* 1 RTL */ 
+/* 0 RTL */ "="
 
 // overloadable operators: !@#$%^&*=`?~\|/+-<>
 // the single character operator "=" is not overloadable

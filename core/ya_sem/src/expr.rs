@@ -576,15 +576,15 @@ impl ParseSynExpr for BinOpExpr {
             let root = op_flat_infos
                 .iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.info.prec.cmp(&b.info.prec))
+                .max_by(|(_, a), (_, b)| b.info.prec.cmp(&a.info.prec))
                 .unwrap();
             
-            let root = if root.1.info.assoc == OpAssoc::Right {
+            let root = if root.1.info.assoc == OpAssoc::Left {
                 op_flat_infos
                     .iter()
                     .enumerate()
                     .rev()
-                    .max_by(|(_, a), (_, b)| a.info.prec.cmp(&b.info.prec))
+                    .max_by(|(_, a), (_, b)| b.info.prec.cmp(&a.info.prec))
                     .map(|(idx, _)| idx)
                     .unwrap()
             } else {

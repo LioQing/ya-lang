@@ -22,11 +22,11 @@ macro_rules! prim_bin_op_info {
 macro_rules! prim_arith_bin_op_info_vec {
     ($($ty:ident),+) => {
         [$(
-            prim_bin_op_info!("+", $ty => $ty; 0x5),
-            prim_bin_op_info!("-", $ty => $ty; 0x5),
-            prim_bin_op_info!("*", $ty => $ty; 0x4),
-            prim_bin_op_info!("/", $ty => $ty; 0x4),
-            prim_bin_op_info!("%", $ty => $ty; 0x4),
+            prim_bin_op_info!("+", $ty => $ty; 0xa),
+            prim_bin_op_info!("-", $ty => $ty; 0xa),
+            prim_bin_op_info!("*", $ty => $ty; 0xb),
+            prim_bin_op_info!("/", $ty => $ty; 0xb),
+            prim_bin_op_info!("%", $ty => $ty; 0xb),
         )+]
     };
 }
