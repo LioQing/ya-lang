@@ -122,7 +122,7 @@ impl Expr {
         }
     }
 
-    pub fn parse_prim(lexer: &mut ya_lexer::Lexer) -> Expr {
+    fn parse_prim(lexer: &mut ya_lexer::Lexer) -> Expr {
         match lexer.peek_token() {
             Ok(ya_lexer::Token { kind: ya_lexer::TokenKind::Identifier { raw }, .. }) if raw.as_str() == "const" => {
                 ConstExpr::parse(lexer)
@@ -379,7 +379,7 @@ pub struct UnOpExpr {
 
 impl UnOpExpr {
     pub fn pre_from_tokens(op: token::Operator, mut expr: Expr) -> Expr {
-        if op.op.len() == 0 {
+        if op.op.is_empty() {
             panic!("empty operator");
         }
 
@@ -395,7 +395,7 @@ impl UnOpExpr {
     }
 
     pub fn suf_from_tokens(op: token::Operator, mut expr: Expr) -> Expr {
-        if op.op.len() == 0 {
+        if op.op.is_empty() {
             panic!("empty operator");
         }
 
@@ -415,11 +415,45 @@ impl UnOpExpr {
         let expr = Expr::parse(lexer);
 
         match expr {
+            // if a binary operator follows, this unary operator expression is the lhs of the binary operation
             Expr::BinOp(BinOpExpr { op: bin_op, lhs, rhs }) => {
                 Expr::BinOp(BinOpExpr {
                     op: bin_op,
                     lhs: Box::new(Self::pre_from_tokens(op, *lhs)),
                     rhs,
+                })
+            },
+            // if a suffix operator follows, this unary operator expression has higher precedence than the suffix operator
+            Expr::UnOp(UnOpExpr { op: suf_op, op_pos: UnOpPos::Suf, mut expr }) => {
+                let mut expr_ref = expr.as_mut();
+                loop {
+                    expr_ref = if let Expr::UnOp(ref mut inner_op) = expr_ref {
+                        if let UnOpExpr { op_pos: UnOpPos::Suf, expr: inner_expr, .. } = inner_op {
+                            match inner_expr.as_ref() {
+                                Expr::UnOp(UnOpExpr { op_pos: UnOpPos::Suf, .. }) => {
+                                    inner_expr.as_mut()
+                                },
+                                _ => {
+                                    // temporarily borrow part of the tree
+                                    let original = std::mem::replace(inner_expr, Box::new(Expr::Err(vec![])));
+                                    
+                                    // put back the parsed expression
+                                    *inner_expr = Box::new(Self::pre_from_tokens(op, *original));
+                                    break;
+                                },
+                            }
+                        } else {
+                            unreachable!();
+                        }
+                    } else {
+                        unreachable!();
+                    }
+                };
+
+                Expr::UnOp(UnOpExpr {
+                    op: suf_op,
+                    op_pos: UnOpPos::Suf,
+                    expr,
                 })
             },
             _ => {
