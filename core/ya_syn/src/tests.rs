@@ -284,7 +284,7 @@ fn unary_operators() {
                     Expr::BinOp(
                         BinOpExpr {
                             op: token::Operator {
-                                op: "+-".to_owned()
+                                op: "+-".to_owned(),
                             },
                             lhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
@@ -308,12 +308,12 @@ fn unary_operators() {
                             )),
                             rhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
-                                    op: '+',
-                                    op_pos: UnOpPos::Pre,
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
                                     expr: Box::new(Expr::UnOp(
                                         UnOpExpr {
-                                            op: '*',
-                                            op_pos: UnOpPos::Suf,
+                                            op: '+',
+                                            op_pos: UnOpPos::Pre,
                                             expr: Box::new(Expr::Lit(
                                                 token::Lit {
                                                     value: "2".to_owned(),
@@ -331,7 +331,7 @@ fn unary_operators() {
                     Expr::BinOp(
                         BinOpExpr {
                             op: token::Operator {
-                                op: "+".to_owned()
+                                op: "+".to_owned(),
                             },
                             lhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
@@ -355,16 +355,16 @@ fn unary_operators() {
                             )),
                             rhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
-                                    op: '-',
-                                    op_pos: UnOpPos::Pre,
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
                                     expr: Box::new(Expr::UnOp(
                                         UnOpExpr {
-                                            op: '+',
+                                            op: '-',
                                             op_pos: UnOpPos::Pre,
                                             expr: Box::new(Expr::UnOp(
                                                 UnOpExpr {
-                                                    op: '*',
-                                                    op_pos: UnOpPos::Suf,
+                                                    op: '+',
+                                                    op_pos: UnOpPos::Pre,
                                                     expr: Box::new(Expr::Lit(
                                                         token::Lit {
                                                             value: "2".to_owned(),
@@ -384,7 +384,7 @@ fn unary_operators() {
                     Expr::BinOp(
                         BinOpExpr {
                             op: token::Operator {
-                                op: "-".to_owned()
+                                op: "-".to_owned(),
                             },
                             lhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
@@ -414,12 +414,12 @@ fn unary_operators() {
                             )),
                             rhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
-                                    op: '+',
-                                    op_pos: UnOpPos::Pre,
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
                                     expr: Box::new(Expr::UnOp(
                                         UnOpExpr {
-                                            op: '*',
-                                            op_pos: UnOpPos::Suf,
+                                            op: '+',
+                                            op_pos: UnOpPos::Pre,
                                             expr: Box::new(Expr::Lit(
                                                 token::Lit {
                                                     value: "2".to_owned(),
@@ -437,7 +437,7 @@ fn unary_operators() {
                     Expr::BinOp(
                         BinOpExpr {
                             op: token::Operator {
-                                op: "-".to_owned()
+                                op: "-".to_owned(),
                             },
                             lhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
@@ -455,20 +455,20 @@ fn unary_operators() {
                             )),
                             rhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
-                                    op: '+',
-                                    op_pos: UnOpPos::Pre,
+                                    op: '*',
+                                    op_pos: UnOpPos::Suf,
                                     expr: Box::new(Expr::UnOp(
                                         UnOpExpr {
-                                            op: '-',
+                                            op: '+',
                                             op_pos: UnOpPos::Pre,
                                             expr: Box::new(Expr::UnOp(
                                                 UnOpExpr {
-                                                    op: '+',
+                                                    op: '-',
                                                     op_pos: UnOpPos::Pre,
                                                     expr: Box::new(Expr::UnOp(
                                                         UnOpExpr {
-                                                            op: '*',
-                                                            op_pos: UnOpPos::Suf,
+                                                            op: '+',
+                                                            op_pos: UnOpPos::Pre,
                                                             expr: Box::new(Expr::Lit(
                                                                 token::Lit {
                                                                     value: "2".to_owned(),
@@ -490,7 +490,7 @@ fn unary_operators() {
                     Expr::BinOp(
                         BinOpExpr {
                             op: token::Operator {
-                                op: "+".to_owned()
+                                op: "+".to_owned(),
                             },
                             lhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
@@ -543,7 +543,7 @@ fn unary_operators() {
                     Expr::BinOp(
                         BinOpExpr {
                             op: token::Operator {
-                                op: "+".to_owned()
+                                op: "+".to_owned(),
                             },
                             lhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
@@ -613,7 +613,7 @@ fn unary_operators() {
                     Expr::BinOp(
                         BinOpExpr {
                             op: token::Operator {
-                                op: "+".to_owned()
+                                op: "+".to_owned(),
                             },
                             lhs: Box::new(Expr::UnOp(
                                 UnOpExpr {
@@ -648,7 +648,7 @@ fn unary_operators() {
                     Expr::BinOp(
                         BinOpExpr {
                             op: token::Operator {
-                                op: "+".to_owned()
+                                op: "+".to_owned(),
                             },
                             lhs: Box::new(Expr::UnOp(
                                 UnOpExpr {

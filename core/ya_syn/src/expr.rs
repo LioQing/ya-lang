@@ -424,8 +424,14 @@ impl UnOpExpr {
                 })
             },
             // if a suffix operator follows, this unary operator expression has higher precedence than the suffix operator
-            Expr::UnOp(UnOpExpr { op: suf_op, op_pos: UnOpPos::Suf, mut expr }) => {
-                let mut expr_ref = expr.as_mut();
+            Expr::UnOp(UnOpExpr { op: suf_op, op_pos: UnOpPos::Suf, expr }) => {
+                let mut expr = Expr::UnOp(UnOpExpr {
+                    op: suf_op,
+                    op_pos: UnOpPos::Suf,
+                    expr,
+                });
+
+                let mut expr_ref = &mut expr;
                 loop {
                     expr_ref = if let Expr::UnOp(ref mut inner_op) = expr_ref {
                         if let UnOpExpr { op_pos: UnOpPos::Suf, expr: inner_expr, .. } = inner_op {
@@ -450,11 +456,7 @@ impl UnOpExpr {
                     }
                 };
 
-                Expr::UnOp(UnOpExpr {
-                    op: suf_op,
-                    op_pos: UnOpPos::Suf,
-                    expr,
-                })
+                expr
             },
             _ => {
                 Self::pre_from_tokens(op, expr)
