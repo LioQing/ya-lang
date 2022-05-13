@@ -12,7 +12,7 @@ fn empty_func() {
     });
 
     assert_eq!(sem_parser.global_env, EnvStack {
-        envs: vec![Env {
+        stack: vec![Env {
             tys: HashMap::new(),
             vars: HashMap::new(),
             bin_ops: HashMap::new(),

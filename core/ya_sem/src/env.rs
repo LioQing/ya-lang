@@ -95,13 +95,13 @@ impl Env {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct EnvStack {
-    pub envs: Vec<Env>,
+    pub stack: Vec<Env>,
     pub funcs: Vec<Expr>,
 }
 
 impl EnvStack {
     pub fn get_ty(&self, ty: &str) -> Result<&Type, Error> {
-        self.envs
+        self.stack
             .iter()
             .rev()
             .find_map(|env| match env.get_ty(ty) {
@@ -112,7 +112,7 @@ impl EnvStack {
     }
 
     pub fn get_var(&self, var: &str) -> Result<&Option<Type>, Error> {
-        self.envs
+        self.stack
             .iter()
             .rev()
             .find_map(|env| match env.get_var(var) {
@@ -123,7 +123,7 @@ impl EnvStack {
     }
 
     pub fn get_var_mut(&mut self, var: &str) -> Result<&mut Option<Type>, Error> {
-        self.envs
+        self.stack
             .iter_mut()
             .rev()
             .find_map(|env| match env.get_var_mut(var) {
@@ -142,7 +142,7 @@ impl EnvStack {
     }
 
     pub fn get_const(&self, c: &str) -> Result<&ConstInfo, Error> {
-        self.envs
+        self.stack
             .iter()
             .rev()
             .find_map(|env| match env.get_const(c) {
@@ -153,7 +153,7 @@ impl EnvStack {
     }
 
     pub fn get_const_mut(&mut self, c: &str) -> Result<&mut ConstInfo, Error> {
-        self.envs
+        self.stack
             .iter_mut()
             .rev()
             .find_map(|env| match env.get_const_mut(c) {
@@ -165,7 +165,7 @@ impl EnvStack {
 
     // Issue #2
     pub fn get_bin_op(&self, bin_op: &BinOp) -> Result<BinOpInfo, Error> {
-        self.envs
+        self.stack
             .iter()
             .rev()
             .find_map(|env| match env.get_bin_op(bin_op) {
@@ -180,7 +180,7 @@ impl EnvStack {
     }
 
     pub fn get_un_op(&self, un_op: &UnOp) -> Result<UnOpInfo, Error> {
-        self.envs
+        self.stack
             .iter()
             .rev()
             .find_map(|env| match env.get_un_op(un_op) {

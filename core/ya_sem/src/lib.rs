@@ -81,7 +81,7 @@ pub struct Parser {
 impl Parser {
     pub fn parse(syn_items: &Vec<ya_syn::Item>, env: Env) -> Self {
         let mut global = EnvStack {
-            envs: vec![env],
+            stack: vec![env],
             funcs: vec![],
         };
         let mut items = vec![];
@@ -110,7 +110,7 @@ impl Parser {
                     errs,
                     env,
                 }, rhs))  => {
-                    global.envs
+                    global.stack
                         .last_mut()
                         .expect("Cannot find environment")
                         .get_const_mut(const_expr.symbol.as_str())

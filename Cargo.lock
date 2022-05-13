@@ -120,6 +120,7 @@ dependencies = [
 name = "ya_interpreter"
 version = "0.1.0"
 dependencies = [
+ "thiserror",
  "ya_core",
 ]
 

@@ -11,7 +11,7 @@ pub trait ParseSynExpr where Self: Sized {
     fn parse(envs: &mut EnvStack, expr: &Self::SynExpr) -> Expr;
 
     fn parse_with_local_vars(envs: &mut EnvStack, expr: &Self::SynExpr, local_vars: HashMap<String, Option<Type>>) -> Expr {
-        envs.envs.push(Env {
+        envs.stack.push(Env {
             tys: HashMap::new(),
             vars: local_vars,
             bin_ops: HashMap::new(),
@@ -21,7 +21,7 @@ pub trait ParseSynExpr where Self: Sized {
 
         let mut expr = Self::parse(envs, expr);
 
-        expr.env = envs.envs.pop();
+        expr.env = envs.stack.pop();
 
         expr
     }
@@ -114,7 +114,7 @@ impl ConstExpr {
         let expr = Self::parse(envs, expr);
 
         if let ExprKind::Const(Self { ref symbol }) = expr.kind {
-            envs.envs
+            envs.stack
                 .last_mut()
                 .expect("No environment found").consts
                 .insert(symbol.clone(), ConstInfo {
@@ -174,7 +174,7 @@ impl ParseSynExpr for LetExpr {
         let symbol = expr.symbol.name.clone();
         let ty = expr.ty.as_ref().map(|ty| ty.into());
 
-        envs.envs
+        envs.stack
             .last_mut()
             .expect("No environment found").vars
             .insert(symbol.clone(), ty.clone());
@@ -307,7 +307,7 @@ impl ParseSynExpr for BlockExpr {
             .collect::<Vec<_>>();
         
         for syn_expr in consts {
-            envs.envs
+            envs.stack
                 .last_mut()
                 .expect("Cannot find environment")
                 .get_const_mut(syn_expr.symbol.name.as_str())
