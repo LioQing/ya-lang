@@ -3,13 +3,10 @@ use super::*;
 #[test]
 fn empty_func() {
     let syn_parser = ya_syn::Parser::parse("const main = () {}");
-    let sem_parser = Parser::parse(&syn_parser.items, Env {
-        tys: HashMap::new(),
-        vars: HashMap::new(),
-        bin_ops: HashMap::new(),
-        un_ops: HashMap::new(),
-        consts: HashMap::new(),
-    });
+    let sem_parser = Parser::parse(
+        &syn_parser.items,
+        EnvStack::new_global(Env::new(), vec![]),
+    );
 
     assert_eq!(sem_parser.global_env, EnvStack {
         stack: vec![Env {
@@ -38,13 +35,10 @@ fn empty_func() {
             ty: Type::Prim(PrimType::Unit),
             kind: ExprKind::Block(BlockExpr { stmts: vec![], expr: None }),
             errs: vec![],
-            env: Some(Env {
-                tys: HashMap::new(),
-                vars: HashMap::new(),
-                bin_ops: HashMap::new(),
-                un_ops: HashMap::new(),
-                consts: HashMap::new(),
-            }),
+            env: Some((
+                Env::new(),
+                Env::new(),
+            )),
         }],
     });
 }

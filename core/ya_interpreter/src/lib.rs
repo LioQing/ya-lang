@@ -136,6 +136,16 @@ impl EnvStack {
             Some(VarVal::Moved) => Err(Error::MovedVar { var: var.to_owned() }),
         }
     }
+
+    pub fn push_frame(&mut self, vars: HashMap<String, VarVal>) {
+        self.stack.push(Env {
+            vars,
+        });
+    }
+
+    pub fn pop_frame(&mut self) {
+        self.stack.pop();
+    }
 }
 
 /// Evaluate the AST
@@ -154,17 +164,20 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
 
     let sem_parser = ya_sem::Parser::parse(
         &syn_parser.items,
-        ya_sem::Env {
-            tys: HashMap::new(),
-            vars: HashMap::new(),
-            bin_ops,
-            un_ops,
-            consts: HashMap::new(),
-        }
+        ya_sem::EnvStack::new_global(
+            ya_sem::Env {
+                tys: HashMap::new(),
+                vars: HashMap::new(),
+                bin_ops,
+                un_ops,
+                consts: HashMap::new(),
+            },
+            vec![],
+        ),
     );
 
     println!("funcs: {:#?}", sem_parser.global_env.funcs);
-    println!("stack: {:#?}", sem_parser.global_env.stack);
+    println!("stack: {:#?}", sem_parser.global_env.stack.iter().map(|env| &env.vars).collect::<Vec<_>>());
 
     let main = sem_parser.global_env.stack
         .first()
@@ -189,17 +202,15 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
     match main {
         ya_sem::Expr { kind: ya_sem::ExprKind::Block(expr), .. } => {
             expr.stmts.iter().for_each(|stmt| {
-                run_expr(&mut envs, stmt);
+                run_expr(&mut envs, &sem_parser.global_env, stmt);
             });
 
             expr.expr.as_ref().map(|expr| {
-                println!("main return: {:?}", run_expr(&mut envs, expr.as_ref()));
+                println!("main return: {:?}", run_expr(&mut envs, &sem_parser.global_env, expr.as_ref()));
             });
         },
         _ => unreachable!(),
     }
-
-    println!("{:#?}", envs.stack);
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -252,7 +263,7 @@ macro_rules! eval_arith_un_op {
     };
 }
 
-fn run_expr(envs: &mut EnvStack, expr: &ya_sem::Expr) -> ExprVal {
+fn run_expr(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, expr: &ya_sem::Expr) -> ExprVal {
     if !expr.errs.is_empty() {
         for err in &expr.errs {
             eprintln!("{}", err);
@@ -296,10 +307,50 @@ fn run_expr(envs: &mut EnvStack, expr: &ya_sem::Expr) -> ExprVal {
         ya_sem::ExprKind::Symbol(ya_sem::SymbolExpr { name }) => {
             try_err!(envs.get_var_val(name.as_str()))
         },
+        ya_sem::ExprKind::Block(expr) => {
+            expr.stmts.iter().for_each(|stmt| {
+                run_expr(envs, sem_envs, stmt);
+            });
+
+            expr.expr
+                .as_ref()
+                .map(|expr| {
+                    run_expr(envs, sem_envs, expr.as_ref())
+                })
+                .unwrap_or(ExprVal::Unit)
+        },
+        ya_sem::ExprKind::Call(ya_sem::CallExpr { callee: callee_expr, args: args_expr }) => {
+            let callee = run_expr(envs, sem_envs, callee_expr);
+            let args = args_expr
+                .iter()
+                .map(|expr| run_expr(envs, sem_envs, expr))
+                .collect::<Vec<_>>();
+
+            let func = match callee {
+                ExprVal::Func(id) => &sem_envs.funcs[id],
+                _ => unimplemented!(),
+            };
+
+            envs.push_frame(
+                match &func.env {
+                    Some((param_env, _)) => {
+                        param_env.vars
+                            .iter()
+                            .zip(args.into_iter())
+                            .map(|((param, _), arg)| (param.clone(), VarVal::Some(arg)))
+                            .collect::<HashMap<_, _>>()
+                    },
+                    None => unreachable!(),
+                }
+            );
+            let result = run_expr(envs, sem_envs, func);
+            envs.pop_frame();
+            result
+        },
         ya_sem::ExprKind::BinOp(ya_sem::BinOpExpr { op, lhs: lhs_expr, rhs: rhs_expr })
         if op.as_str() == "=" => {
-            let _lhs = run_expr(envs, lhs_expr.as_ref());
-            let rhs = run_expr(envs, rhs_expr.as_ref());
+            let _lhs = run_expr(envs, sem_envs, lhs_expr.as_ref());
+            let rhs = run_expr(envs, sem_envs, rhs_expr.as_ref());
 
             // special case: "=" operator
             match &lhs_expr.as_ref().kind {
@@ -309,10 +360,10 @@ fn run_expr(envs: &mut EnvStack, expr: &ya_sem::Expr) -> ExprVal {
                 },
                 _ => unimplemented!(),
             }
-        }
+        },
         ya_sem::ExprKind::BinOp(ya_sem::BinOpExpr { op, lhs: lhs_expr, rhs: rhs_expr }) => {
-            let lhs = run_expr(envs, lhs_expr.as_ref());
-            let rhs = run_expr(envs, rhs_expr.as_ref());
+            let lhs = run_expr(envs, sem_envs, lhs_expr.as_ref());
+            let rhs = run_expr(envs, sem_envs, rhs_expr.as_ref());
 
             match op.as_str() {
                 "+" => eval_arith_bin_op!(envs, lhs, rhs, +; I8, I16, I32, I64, U8, U16, U32, U64, F32, F64),
@@ -324,13 +375,16 @@ fn run_expr(envs: &mut EnvStack, expr: &ya_sem::Expr) -> ExprVal {
             }
         },
         ya_sem::ExprKind::UnOp(ya_sem::UnOpExpr { op, op_pos, expr }) => {
-            let val = run_expr(envs, expr.as_ref());
+            let val = run_expr(envs, sem_envs, expr.as_ref());
 
             match (op, op_pos) {
                 ('-', ya_sem::UnOpPos::Pre) => eval_arith_un_op!(envs, val, prefix -; I8, I16, I32, I64, F32, F64),
                 _ => unimplemented!(),
             }
         },
-        _ => unimplemented!(),
+        ya_sem::ExprKind::Func(ya_sem::FuncExpr { id }) => {
+            ExprVal::Func(*id)
+        },
+        f => unimplemented!("{:?}", f),
     }
 }

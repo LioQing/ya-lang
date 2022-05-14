@@ -78,12 +78,7 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn parse(syn_items: &Vec<ya_syn::Item>, env: Env) -> Self {
-        let mut global = EnvStack {
-            stack: vec![env],
-            funcs: vec![],
-        };
-
+    pub fn parse(syn_items: &Vec<ya_syn::Item>, mut global: EnvStack) -> Self {
         // first scan: parse declarations
         let item_decls = syn_items
             .iter()

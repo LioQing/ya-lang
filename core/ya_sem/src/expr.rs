@@ -19,9 +19,17 @@ pub trait ParseSynExpr where Self: Sized {
             consts: HashMap::new(),
         });
 
+        envs.stack.push(Env::new());
+
         let mut expr = Self::parse(envs, expr);
 
-        expr.env = envs.stack.pop();
+        expr.env = match (envs.stack.pop(), envs.stack.pop()) {
+            (Some(env_inner), Some(env_outer)) => {
+                Some((env_outer, env_inner))
+            },
+            (None, None) => None,
+            _ => unreachable!(),
+        };
 
         expr
     }
@@ -32,7 +40,9 @@ pub struct Expr {
     pub ty: Type,
     pub kind: ExprKind,
     pub errs: Vec<Error>,
-    pub env: Option<Env>,
+
+    /// 0 - param, 1 - local
+    pub env: Option<(Env, Env)>,
 }
 
 impl Expr {
@@ -386,7 +396,7 @@ impl ParseSynExpr for CallExpr {
         let callee = Box::new(Expr::parse(envs, &*expr.callee));
 
         // check arguments
-        match &callee.as_ref().ty {
+        let ret_ty = match &callee.as_ref().ty {
             Type::Func(ty) => {
                 ty.params
                     .iter()
@@ -412,12 +422,17 @@ impl ParseSynExpr for CallExpr {
                             });
                         },
                     });
+
+                ty.ret_ty.as_ref().clone()
             },
-            found => { errs.push(Error::ExpectedCallable { found: found.clone() }); },
+            found => {
+                errs.push(Error::ExpectedCallable { found: found.clone() });
+                Type::Prim(PrimType::Unit)
+            },
         };
 
         Expr::new(
-            callee.ty.clone(),
+            ret_ty,
             ExprKind::Call(CallExpr {
                 callee,
                 args
@@ -492,7 +507,7 @@ impl ParseSynExpr for BinOpExpr {
                                 ExprKind::Let(ref mut let_expr) => {
                                     match envs.get_var_mut(let_expr.symbol.as_str()) {
                                         Ok(ty) => match ty {
-                                            Some(ty) if rhs.ty == *ty => {},
+                                            Some(ty) if rhs.ty == *ty => *ty = rhs.ty.clone(),
                                             Some(ty) => errs.push(Error::AssignmentMismatchedOperandTypes {
                                                 lhs: ty.clone(),
                                                 rhs: rhs.ty.clone()
@@ -691,7 +706,7 @@ impl ParseSynExpr for FuncExpr {
                 },
                 _ => unreachable!(),
             },
-            vars
+            vars,
         );
         envs.funcs.push(func);
 

@@ -1,6 +1,7 @@
 const main = () {
-    let b = 2;
+    let get_two = () -> i32 { 2 };
+    let b = get_two();
     let a = b + 2;
 
-    -6 + 5 * a / 3 - 2 % 1
+    6 + 5 * a / 3 - 2 % 1
 }

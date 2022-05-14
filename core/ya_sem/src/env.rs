@@ -10,6 +10,16 @@ pub struct Env {
 }
 
 impl Env {
+    pub fn new() -> Self {
+        Env {
+            tys: HashMap::new(),
+            vars: HashMap::new(),
+            bin_ops: HashMap::new(),
+            un_ops: HashMap::new(),
+            consts: HashMap::new(),
+        }
+    }
+
     pub fn get_ty(&self, ty: &str) -> Result<&Type, Error> {
         self.tys
             .get(ty)
@@ -100,6 +110,13 @@ pub struct EnvStack {
 }
 
 impl EnvStack {
+    pub fn new_global(global_env: Env, funcs: Vec<Expr>) -> Self {
+        EnvStack {
+            stack: vec![global_env],
+            funcs,
+        }
+    }
+
     pub fn get_ty(&self, ty: &str) -> Result<&Type, Error> {
         self.stack
             .iter()
