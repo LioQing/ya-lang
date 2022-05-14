@@ -59,6 +59,19 @@ macro_rules! un_op_info {
     };
 }
 
+macro_rules! prim_un_op_info_vec {
+    (prefix $op:literal; $($ty:ident),+) => {
+        [$(
+            un_op_info!($op, Type::Prim(PrimType::$ty) => Type::Prim(PrimType::$ty)),
+        )+]
+    };
+    (suffix $op:literal; $($ty:ident),+) => {
+        [$(
+            un_op_info!(Type::Prim(PrimType::$ty), $op => Type::Prim(PrimType::$ty)),
+        )+]
+    };
+}
+
 #[derive(Debug, PartialEq)]
 enum VarVal {
     Some(ExprVal),
@@ -107,11 +120,18 @@ impl EnvStack {
         }
     }
 
-    pub fn get_symbol_expr(&self, var: &str) -> Result<ExprVal, Error> {
-        let var_ref = self.stack.iter().rev().find_map(|env| env.vars.get(var));
+    pub fn get_var_val(&mut self, var: &str) -> Result<ExprVal, Error> {
+        let var_ref = self.stack.iter_mut().rev().find_map(|env| env.vars.get_mut(var));
         match var_ref {
             None => Err(Error::VarNotFound { var: var.to_owned() }),
-            Some(VarVal::Some(val)) => Ok(val.clone()),
+            Some(VarVal::Some(_)) => {
+                let var_val = std::mem::replace(var_ref.unwrap(), VarVal::Moved);
+                if let VarVal::Some(val) = var_val {
+                    Ok(val)
+                } else {
+                    unreachable!()
+                }
+            },
             Some(VarVal::Uninitialized) => Err(Error::UninitVar { var: var.to_owned() }),
             Some(VarVal::Moved) => Err(Error::MovedVar { var: var.to_owned() }),
         }
@@ -122,9 +142,9 @@ impl EnvStack {
 pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
     let bin_ops: HashMap<_, _> = prim_arith_bin_op_info_vec!(I8, I16, I32, I64, U8, U16, U32, U64, F32, F64).into();
 
-    let un_ops: HashMap<_, _> = [
-        un_op_info!('-', Type::Prim(PrimType::I32) => Type::Prim(PrimType::I32)),
-    ].into();
+    let un_ops: HashMap<_, _> = 
+        prim_un_op_info_vec!(prefix '-'; I8, I16, I32, I64, F32, F64).into_iter()
+        .collect();
 
     let src = std::fs::read_to_string(path).unwrap();
 
@@ -144,7 +164,7 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
     );
 
     println!("funcs: {:#?}", sem_parser.global_env.funcs);
-    println!("items: {:#?}", sem_parser.items);
+    println!("stack: {:#?}", sem_parser.global_env.stack);
 
     let main = sem_parser.global_env.stack
         .first()
@@ -182,7 +202,7 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
     println!("{:#?}", envs.stack);
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExprVal {
     Unit,
     I8(i8),
@@ -199,6 +219,7 @@ pub enum ExprVal {
     Char(u8),
     ISize(isize),
     USize(usize),
+    Func(usize),
 }
 
 macro_rules! try_err {
@@ -217,6 +238,15 @@ macro_rules! eval_arith_bin_op {
     ($envs:ident, $lhs:ident, $rhs:ident, $eval:tt; $($ty:ident),*) => {
         match ($lhs, $rhs) {
             $((ExprVal::$ty(l), ExprVal::$ty(r)) => ExprVal::$ty(l $eval r),)*
+            _ => unimplemented!()
+        }
+    };
+}
+
+macro_rules! eval_arith_un_op {
+    ($envs:ident, $val:ident, prefix $eval:tt; $($ty:ident),*) => {
+        match $val {
+            $(ExprVal::$ty(v) => ExprVal::$ty($eval v),)*
             _ => unimplemented!()
         }
     };
@@ -264,26 +294,40 @@ fn run_expr(envs: &mut EnvStack, expr: &ya_sem::Expr) -> ExprVal {
             }
         },
         ya_sem::ExprKind::Symbol(ya_sem::SymbolExpr { name }) => {
-            try_err!(envs.get_symbol_expr(name.as_str()))
+            try_err!(envs.get_var_val(name.as_str()))
         },
+        ya_sem::ExprKind::BinOp(ya_sem::BinOpExpr { op, lhs: lhs_expr, rhs: rhs_expr })
+        if op.as_str() == "=" => {
+            let _lhs = run_expr(envs, lhs_expr.as_ref());
+            let rhs = run_expr(envs, rhs_expr.as_ref());
+
+            // special case: "=" operator
+            match &lhs_expr.as_ref().kind {
+                ya_sem::ExprKind::Let(let_expr) => {
+                    try_err!(envs.assign_var(let_expr.symbol.as_str(), rhs));
+                    ExprVal::Unit
+                },
+                _ => unimplemented!(),
+            }
+        }
         ya_sem::ExprKind::BinOp(ya_sem::BinOpExpr { op, lhs: lhs_expr, rhs: rhs_expr }) => {
             let lhs = run_expr(envs, lhs_expr.as_ref());
             let rhs = run_expr(envs, rhs_expr.as_ref());
 
             match op.as_str() {
-                // special case: "=" operator
-                "=" => match &lhs_expr.as_ref().kind {
-                    ya_sem::ExprKind::Let(let_expr) => {
-                        try_err!(envs.assign_var(let_expr.symbol.as_str(), rhs));
-                        ExprVal::Unit
-                    },
-                    _ => unimplemented!(),
-                },
                 "+" => eval_arith_bin_op!(envs, lhs, rhs, +; I8, I16, I32, I64, U8, U16, U32, U64, F32, F64),
                 "-" => eval_arith_bin_op!(envs, lhs, rhs, -; I8, I16, I32, I64, U8, U16, U32, U64, F32, F64),
                 "*" => eval_arith_bin_op!(envs, lhs, rhs, *; I8, I16, I32, I64, U8, U16, U32, U64, F32, F64),
                 "/" => eval_arith_bin_op!(envs, lhs, rhs, /; I8, I16, I32, I64, U8, U16, U32, U64, F32, F64),
                 "%" => eval_arith_bin_op!(envs, lhs, rhs, %; I8, I16, I32, I64, U8, U16, U32, U64, F32, F64),
+                _ => unimplemented!(),
+            }
+        },
+        ya_sem::ExprKind::UnOp(ya_sem::UnOpExpr { op, op_pos, expr }) => {
+            let val = run_expr(envs, expr.as_ref());
+
+            match (op, op_pos) {
+                ('-', ya_sem::UnOpPos::Pre) => eval_arith_un_op!(envs, val, prefix -; I8, I16, I32, I64, F32, F64),
                 _ => unimplemented!(),
             }
         },

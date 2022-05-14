@@ -506,7 +506,7 @@ impl ParseSynExpr for BinOpExpr {
                             }
 
                             op_flat_infos.push(OpFlatInfo {
-                                info: BinOpInfo::new_builtin(Type::Prim(PrimType::Unit), 0xf),
+                                info: BinOpInfo::new_builtin(Type::Prim(PrimType::Unit), 0x0),
                                 op: curr_op.op.op.clone(),
                                 errs,
                                 lhs: idx,

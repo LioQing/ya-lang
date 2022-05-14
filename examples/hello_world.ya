@@ -1,5 +1,6 @@
 const main = () {
-    let a = 4;
+    let b = 2;
+    let a = b + 2;
 
-    6 + 5 * a / 3 - 2 % 1
+    -6 + 5 * a / 3 - 2 % 1
 }

@@ -75,7 +75,6 @@ pub enum Error {
 /// Parse the parse tree into an AST.
 pub struct Parser {
     pub global_env: EnvStack,
-    pub items: Vec<Expr>,
 }
 
 impl Parser {
@@ -84,7 +83,6 @@ impl Parser {
             stack: vec![env],
             funcs: vec![],
         };
-        let mut items = vec![];
 
         // first scan: parse declarations
         let item_decls = syn_items
@@ -104,19 +102,13 @@ impl Parser {
         // second scan: parse definitions
         for item in item_decls {
             match item {
-                Some((Expr {
-                    ty,
-                    kind: ExprKind::Const(const_expr),
-                    errs,
-                    env,
-                }, rhs))  => {
+                Some((Expr { kind: ExprKind::Const(const_expr), .. }, rhs))  => {
                     global.stack
                         .last_mut()
                         .expect("Cannot find environment")
                         .get_const_mut(const_expr.symbol.as_str())
                         .expect("Cannot find constant")
                         .rhs = Expr::parse(&mut global, rhs);
-                    items.push(Expr { ty, kind: ExprKind::Const(const_expr), errs, env });
                 },
                 None => {},
                 _ => unimplemented!(),
@@ -125,7 +117,6 @@ impl Parser {
 
         Self {
             global_env: global,
-            items,
         }
     }
 }
