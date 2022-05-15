@@ -177,7 +177,7 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
 
     println!("{:#?}", syn_parser.items);
 
-    let sem_parser = ya_sem::Parser::parse(
+    let mut sem_parser = ya_sem::Parser::parse(
         &syn_parser.items,
         ya_sem::EnvStack::new_global(
             ya_sem::Env {
@@ -204,26 +204,11 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
     );
 
     println!("envs: {:#?}", envs);
-    
-    let main_func = ya_sem::Expr {
-        ty: ya_sem::Type::Prim(PrimType::I32),
-        kind: ya_sem::ExprKind::Call(ya_sem::CallExpr {
-            callee: Box::new(ya_sem::Expr {
-                ty: ya_sem::Type::Func(ya_sem::FuncType {
-                    params: vec![],
-                    ret_ty: Box::new(ya_sem::Type::Prim(PrimType::I32)),
-                }),
-                kind: ya_sem::ExprKind::Symbol(ya_sem::SymbolExpr {
-                    name: "main".to_owned(),
-                }),
-                errs: vec![],
-                env: None,
-            }),
-            args: vec![],
-        }),
-        errs: vec![],
-        env: None,
-    };
+
+    let main_func = <ya_sem::Expr as ya_sem::ParseSynExpr>::parse(
+        &mut sem_parser.global_env,
+        &ya_syn::Expr::parse(&mut ya_lexer::Lexer::new("main()")),
+    );
 
     println!("main return: {:?}", run_expr(&mut envs, &sem_parser.global_env, &main_func));
 }
