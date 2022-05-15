@@ -7,14 +7,14 @@ use ya_core::ya_prim_types::PrimType;
 
 #[derive(Error, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Error {
-    #[error("Unintialized variable {var}")]
+    #[error("Unintialized variable `{var}`")]
     UninitVar { var: String },
 
-    #[error("Moved variable {var}")]
+    #[error("Moved variable `{var}`")]
     MovedVar { var: String },
 
-    #[error("Var not found {var}")]
-    VarNotFound { var: String },
+    #[error("Symbol not found `{symbol}`")]
+    SymbolNotFound { symbol: String },
 }
 
 macro_rules! bin_op_info {
@@ -82,12 +82,14 @@ enum VarVal {
 #[derive(Debug, PartialEq)]
 struct Env {
     pub vars: HashMap<String, VarVal>,
+    pub consts: HashMap<String, ExprVal>,
 }
 
 impl Env {
     pub fn new() -> Self {
         Env {
             vars: HashMap::new(),
+            consts: HashMap::new(),
         }
     }
 }
@@ -100,7 +102,7 @@ struct EnvStack {
 impl EnvStack {
     pub fn new() -> Self {
         Self {
-            stack: vec![Env::new()],
+            stack: vec![],
         }
     }
 
@@ -108,10 +110,14 @@ impl EnvStack {
         self.stack.last_mut().unwrap().vars.insert(var, val);
     }
 
+    pub fn add_const(&mut self, var: String, val: ExprVal) {
+        self.stack.last_mut().unwrap().consts.insert(var, val);
+    }
+
     pub fn assign_var(&mut self, var: &str, val: ExprVal) -> Result<(), Error> {
         let var_ref = self.stack.iter_mut().rev().find_map(|env| env.vars.get_mut(var));
         match var_ref {
-            None => Err(Error::VarNotFound { var: var.to_owned() }),
+            None => Err(Error::SymbolNotFound { symbol: var.to_owned() }),
             Some(VarVal::Moved) => Err(Error::MovedVar { var: var.to_owned() }),
             _ => {
                 *var_ref.unwrap() = VarVal::Some(val);
@@ -123,7 +129,7 @@ impl EnvStack {
     pub fn get_var_val(&mut self, var: &str) -> Result<ExprVal, Error> {
         let var_ref = self.stack.iter_mut().rev().find_map(|env| env.vars.get_mut(var));
         match var_ref {
-            None => Err(Error::VarNotFound { var: var.to_owned() }),
+            None => Err(Error::SymbolNotFound { symbol: var.to_owned() }),
             Some(VarVal::Some(_)) => {
                 let var_val = std::mem::replace(var_ref.unwrap(), VarVal::Moved);
                 if let VarVal::Some(val) = var_val {
@@ -137,9 +143,18 @@ impl EnvStack {
         }
     }
 
-    pub fn push_frame(&mut self, vars: HashMap<String, VarVal>) {
+    pub fn get_const_val(&self, name: &str) -> Result<&ExprVal, Error> {
+        let const_ref = self.stack.iter().rev().find_map(|env| env.consts.get(name));
+        match const_ref {
+            None => Err(Error::SymbolNotFound { symbol: name.to_owned() }),
+            Some(val) => Ok(val),
+        }
+    }
+
+    pub fn push_frame(&mut self, vars: HashMap<String, VarVal>, consts: HashMap<String, ExprVal>) {
         self.stack.push(Env {
             vars,
+            consts,
         });
     }
 
@@ -179,38 +194,38 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
     println!("funcs: {:#?}", sem_parser.global_env.funcs);
     println!("stack: {:#?}", sem_parser.global_env.stack.iter().map(|env| &env.vars).collect::<Vec<_>>());
 
-    let main = sem_parser.global_env.stack
-        .first()
-        .expect("Cannot find environment")
-        .consts
-        .iter()
-        .find_map(|(var, info)| match var.as_str() {
-            "main" => {
-                match &info.rhs {
-                    ya_sem::Expr { kind: ya_sem::ExprKind::Func(ya_sem::FuncExpr { id }), .. } => {
-                        Some(&sem_parser.global_env.funcs[*id])
-                    },
-                    _ => None,
-                }
-            },
-            _ => None,
-        })
-        .expect("Cannot find main function, the main functions has to be a constant function named main");
-    
     let mut envs = EnvStack::new();
+    envs.push_frame(HashMap::new(), HashMap::new());
 
-    match main {
-        ya_sem::Expr { kind: ya_sem::ExprKind::Block(expr), .. } => {
-            expr.stmts.iter().for_each(|stmt| {
-                run_expr(&mut envs, &sem_parser.global_env, stmt);
-            });
+    parse_consts(
+        &mut envs,
+        &sem_parser.global_env,
+        &sem_parser.global_env.stack.last().expect("env stack is empty"),
+    );
 
-            expr.expr.as_ref().map(|expr| {
-                println!("main return: {:?}", run_expr(&mut envs, &sem_parser.global_env, expr.as_ref()));
-            });
-        },
-        _ => unreachable!(),
-    }
+    println!("envs: {:#?}", envs);
+    
+    let main_func = ya_sem::Expr {
+        ty: ya_sem::Type::Prim(PrimType::I32),
+        kind: ya_sem::ExprKind::Call(ya_sem::CallExpr {
+            callee: Box::new(ya_sem::Expr {
+                ty: ya_sem::Type::Func(ya_sem::FuncType {
+                    params: vec![],
+                    ret_ty: Box::new(ya_sem::Type::Prim(PrimType::I32)),
+                }),
+                kind: ya_sem::ExprKind::Symbol(ya_sem::SymbolExpr {
+                    name: "main".to_owned(),
+                }),
+                errs: vec![],
+                env: None,
+            }),
+            args: vec![],
+        }),
+        errs: vec![],
+        env: None,
+    };
+
+    println!("main return: {:?}", run_expr(&mut envs, &sem_parser.global_env, &main_func));
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -273,6 +288,7 @@ fn run_expr(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, expr: &ya_sem::Exp
     }
 
     match &expr.kind {
+        ya_sem::ExprKind::Const(_) => ExprVal::Unit,
         ya_sem::ExprKind::Let(ya_sem::LetExpr { symbol }) => {
             envs.add_var(symbol.to_owned(), VarVal::Uninitialized);
             ExprVal::Unit
@@ -305,14 +321,23 @@ fn run_expr(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, expr: &ya_sem::Exp
             }
         },
         ya_sem::ExprKind::Symbol(ya_sem::SymbolExpr { name }) => {
-            try_err!(envs.get_var_val(name.as_str()))
+            try_err!(
+                envs
+                    .get_var_val(name.as_str())
+                    .or_else(|_| envs.get_const_val(name.as_str()).map(|val| val.clone()))
+            )
         },
-        ya_sem::ExprKind::Block(expr) => {
-            expr.stmts.iter().for_each(|stmt| {
+        ya_sem::ExprKind::Block(block) => {
+            // constants
+            if expr.env.is_some() {
+                parse_consts(envs, sem_envs, &expr.env.as_ref().unwrap().1);
+            }
+            
+            block.stmts.iter().for_each(|stmt| {
                 run_expr(envs, sem_envs, stmt);
             });
 
-            expr.expr
+            block.expr
                 .as_ref()
                 .map(|expr| {
                     run_expr(envs, sem_envs, expr.as_ref())
@@ -328,7 +353,7 @@ fn run_expr(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, expr: &ya_sem::Exp
 
             let func = match callee {
                 ExprVal::Func(id) => &sem_envs.funcs[id],
-                _ => unimplemented!(),
+                _ => unreachable!(),
             };
 
             envs.push_frame(
@@ -341,7 +366,8 @@ fn run_expr(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, expr: &ya_sem::Exp
                             .collect::<HashMap<_, _>>()
                     },
                     None => unreachable!(),
-                }
+                },
+                HashMap::new(),
             );
             let result = run_expr(envs, sem_envs, func);
             envs.pop_frame();
@@ -386,5 +412,51 @@ fn run_expr(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, expr: &ya_sem::Exp
             ExprVal::Func(*id)
         },
         f => unimplemented!("{:?}", f),
+    }
+}
+
+fn parse_consts(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, curr_sem_env: &ya_sem::Env) {
+    let mut sem_consts = curr_sem_env
+        .consts
+        .iter()
+        .map(|(name, info)| (name, info))
+        .collect::<HashMap<_, _>>();
+    
+    while !sem_consts.is_empty() {
+        let mut to_be_removed = vec![];
+
+        for (name, info) in &sem_consts {
+            if info.rhs
+                .find_all_expr(|expr| match &expr.kind {
+                    ya_sem::ExprKind::Symbol(_) => true,
+                    _ => false,
+                })
+                .into_iter()
+                .map(|expr| match &expr.kind {
+                    ya_sem::ExprKind::Symbol(ya_sem::SymbolExpr { name }) => {
+                        curr_sem_env.consts.get(name)
+                    },
+                    _ => unreachable!(),
+                })
+                .any(|dep| dep.is_none())
+            {
+                continue;
+            }
+
+            let name = (*name).clone();
+            let expr_val = run_expr(envs, sem_envs, &info.rhs);
+
+            to_be_removed.push(name.clone());
+            envs.add_const(name, expr_val);
+        }
+
+        if to_be_removed.is_empty() {
+            eprintln!("Cannot resolve constant dependencies");
+            break;
+        } else {
+            for name in to_be_removed {
+                sem_consts.remove(&name);
+            }
+        }
     }
 }

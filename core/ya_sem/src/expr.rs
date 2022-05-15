@@ -74,6 +74,47 @@ impl Expr {
             _ => Ok(Type::Prim(PrimType::Unit)),
         }
     }
+
+    pub fn find_all_expr(&self, pred: fn(&Expr) -> bool) -> Vec<&Expr> {
+        let mut res = vec![];
+
+        if pred(&self) {
+            res.push(self);
+        }
+
+        match &self.kind {
+            ExprKind::Block(block) => {
+                for stmt in &block.stmts {
+                    res.extend(stmt.find_all_expr(pred));
+                }
+
+                if let Some(expr) = &block.expr {
+                    res.extend(expr.find_all_expr(pred));
+                }
+            },
+            ExprKind::Tuple(tuple) => {
+                for expr in &tuple.items {
+                    res.extend(expr.find_all_expr(pred));
+                }
+            },
+            ExprKind::Call(call) => {
+                res.extend(call.callee.find_all_expr(pred));
+                for arg in &call.args {
+                    res.extend(arg.find_all_expr(pred));
+                }
+            },
+            ExprKind::BinOp(bin) => {
+                res.extend(bin.lhs.find_all_expr(pred));
+                res.extend(bin.rhs.find_all_expr(pred));
+            },
+            ExprKind::UnOp(un) => {
+                res.extend(un.expr.find_all_expr(pred));
+            },
+            _ => {},
+        }
+
+        res
+    }
 }
 
 impl ParseSynExpr for Expr {
@@ -126,7 +167,8 @@ impl ConstExpr {
         if let ExprKind::Const(Self { ref symbol }) = expr.kind {
             envs.stack
                 .last_mut()
-                .expect("No environment found").consts
+                .expect("No environment found")
+                .consts
                 .insert(symbol.clone(), ConstInfo {
                     rhs: Expr::new_ok(expr.ty.clone(), ExprKind::Block(BlockExpr { stmts: vec![], expr: None })),
                     errs: expr.errs.clone(),

@@ -44,11 +44,8 @@ pub enum Error {
     #[error("Assignment operation `=` with mismatched operand types {lhs:?} and {rhs:?}")]
     AssignmentMismatchedOperandTypes { lhs: Type, rhs: Type },
 
-    #[error("Variable not found {var}")]
-    VarNotFound { var: String },
-
-    #[error("Constant not found {c}")]
-    ConstNotFound { c: String },
+    #[error("Symbol not found {symbol}")]
+    SymbolNotFound { symbol: String },
 
     #[error("Type not found {ty}")]
     TypeNotFound { ty: String },

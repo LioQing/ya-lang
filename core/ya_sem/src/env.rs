@@ -29,13 +29,13 @@ impl Env {
     pub fn get_var(&self, var: &str) -> Result<&Option<Type>, Error> {
         self.vars
             .get(var)
-            .ok_or(Error::VarNotFound { var: var.to_owned() })
+            .ok_or(Error::SymbolNotFound { symbol: var.to_owned() })
     }
 
     pub fn get_var_mut(&mut self, var: &str) -> Result<&mut Option<Type>, Error> {
         self.vars
             .get_mut(var)
-            .ok_or(Error::VarNotFound { var: var.to_owned() })
+            .ok_or(Error::SymbolNotFound { symbol: var.to_owned() })
     }
 
     pub fn get_def_var(&self, var: &str) -> Result<&Type, Error> {
@@ -49,13 +49,13 @@ impl Env {
     pub fn get_const(&self, c: &str) -> Result<&ConstInfo, Error> {
         self.consts
             .get(c)
-            .ok_or(Error::ConstNotFound { c: c.to_owned() })
+            .ok_or(Error::SymbolNotFound { symbol: c.to_owned() })
     }
 
     pub fn get_const_mut(&mut self, c: &str) -> Result<&mut ConstInfo, Error> {
         self.consts
             .get_mut(c)
-            .ok_or(Error::ConstNotFound { c: c.to_owned() })
+            .ok_or(Error::SymbolNotFound { symbol: c.to_owned() })
     }
 
     // Issue #2
@@ -136,7 +136,7 @@ impl EnvStack {
                 Ok(ty) => Some(ty),
                 Err(_) => None,
             })
-            .ok_or(Error::VarNotFound { var: var.to_owned() })
+            .ok_or(Error::SymbolNotFound { symbol: var.to_owned() })
     }
 
     pub fn get_var_mut(&mut self, var: &str) -> Result<&mut Option<Type>, Error> {
@@ -147,7 +147,7 @@ impl EnvStack {
                 Ok(ty) => Some(ty),
                 Err(_) => None,
             })
-            .ok_or(Error::VarNotFound { var: var.to_owned() })
+            .ok_or(Error::SymbolNotFound { symbol: var.to_owned() })
     }
 
     pub fn get_def_var(&self, var: &str) -> Result<&Type, Error> {
@@ -166,7 +166,7 @@ impl EnvStack {
                 Ok(c) => Some(c),
                 Err(_) => None,
             })
-            .ok_or(Error::ConstNotFound { c: c.to_owned() })
+            .ok_or(Error::SymbolNotFound { symbol: c.to_owned() })
     }
 
     pub fn get_const_mut(&mut self, c: &str) -> Result<&mut ConstInfo, Error> {
@@ -177,7 +177,7 @@ impl EnvStack {
                 Ok(c) => Some(c),
                 Err(_) => None,
             })
-            .ok_or(Error::ConstNotFound { c: c.to_owned() })
+            .ok_or(Error::SymbolNotFound { symbol: c.to_owned() })
     }
 
     // Issue #2
