@@ -110,8 +110,8 @@ impl EnvStack {
         self.stack.last_mut().unwrap().vars.insert(var, val);
     }
 
-    pub fn add_const(&mut self, var: String, val: ExprVal) {
-        self.stack.last_mut().unwrap().consts.insert(var, val);
+    pub fn add_const(&mut self, name: String, val: ExprVal) {
+        self.stack.last_mut().unwrap().consts.insert(name, val);
     }
 
     pub fn assign_var(&mut self, var: &str, val: ExprVal) -> Result<(), Error> {
@@ -192,12 +192,12 @@ pub fn run<P>(path: P) where P: AsRef<std::path::Path> {
     );
 
     println!("funcs: {:#?}", sem_parser.global_env.funcs);
-    println!("stack: {:#?}", sem_parser.global_env.stack.iter().map(|env| &env.vars).collect::<Vec<_>>());
+    println!("stack: {:#?}", sem_parser.global_env.stack.iter().map(|env| &env.consts).collect::<Vec<_>>());
 
     let mut envs = EnvStack::new();
     envs.push_frame(HashMap::new(), HashMap::new());
 
-    parse_consts(
+    eval_consts(
         &mut envs,
         &sem_parser.global_env,
         &sem_parser.global_env.stack.last().expect("env stack is empty"),
@@ -315,7 +315,7 @@ fn run_expr(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, expr: &ya_sem::Exp
         ya_sem::ExprKind::Block(block) => {
             // constants
             if expr.env.is_some() {
-                parse_consts(envs, sem_envs, &expr.env.as_ref().unwrap().1);
+                eval_consts(envs, sem_envs, &expr.env.as_ref().unwrap().1);
             }
             
             block.stmts.iter().for_each(|stmt| {
@@ -400,7 +400,7 @@ fn run_expr(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, expr: &ya_sem::Exp
     }
 }
 
-fn parse_consts(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, curr_sem_env: &ya_sem::Env) {
+fn eval_consts(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, curr_sem_env: &ya_sem::Env) {
     let mut sem_consts = curr_sem_env
         .consts
         .iter()
@@ -417,13 +417,12 @@ fn parse_consts(envs: &mut EnvStack, sem_envs: &ya_sem::EnvStack, curr_sem_env: 
                     _ => false,
                 })
                 .into_iter()
-                .map(|expr| match &expr.kind {
+                .any(|expr| match &expr.kind {
                     ya_sem::ExprKind::Symbol(ya_sem::SymbolExpr { name }) => {
-                        curr_sem_env.consts.get(name)
+                        envs.get_const_val(name).is_err()
                     },
                     _ => unreachable!(),
                 })
-                .any(|dep| dep.is_none())
             {
                 continue;
             }

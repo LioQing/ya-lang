@@ -1,8 +1,7 @@
 const main = () {
-    let b = get_two();
-    const get_two = () -> i32 { 2 };
+    const x = get_two() + get_one();
     const get_one = () -> i32 { get_two() - 1 };
-    let a = b + 2;
+    const get_two = () -> i32 { 2 };
 
-    6 + 5 * a / 3 - 2 % 1
+    x
 }
