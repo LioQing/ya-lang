@@ -1,7 +1,0 @@
-const main = () {
-    const x = get_two() + get_one();
-    const get_one = () -> i32 { get_two() - 1 };
-    const get_two = () -> i32 { 2 };
-
-    x
-}
