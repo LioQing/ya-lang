@@ -18,6 +18,34 @@ impl Span {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Spanned<T> {
+    pub value: T,
+    pub span: Span,
+}
+
+impl<T> Spanned<T> {
+    pub fn new(value: T, span: Span) -> Self {
+        Self { value, span }
+    }
+
+    pub fn new_value(value: T) -> Self {
+        Self {
+            span: Span::new(0, 0..0, 0..0, 0),
+            value,
+        }
+    }
+}
+
+impl<T> std::fmt::Display for Spanned<T>
+where
+    T: std::fmt::Display
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum TokenKind {
     /** parentheses */
     Paren { raw: char, depth: usize, kind: ParenKind },
@@ -48,21 +76,4 @@ pub enum LitKind {
     Quote { quote: char },
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct Token {
-    pub kind: TokenKind,
-    pub span: Span,
-}
-
-impl Token {
-    pub fn new(kind: TokenKind, span: Span) -> Self {
-        Self { kind, span }
-    }
-
-    pub fn new_kind(kind: TokenKind) -> Self {
-        Self {
-            kind,
-            span: Span::new(0, 0..0, 0..0, 0),
-        }
-    }
-}
+pub type Token = Spanned<TokenKind>;

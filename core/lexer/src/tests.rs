@@ -1,5 +1,7 @@
 use super::*;
 
+// valid
+
 #[test]
 fn parens() {
     let mut lexer = Lexer::new("()[({}){}]");
@@ -206,4 +208,99 @@ fn punc() {
         TokenKind::Punc { raw: ".*!&@".to_owned() },
         Span::new(0, 11..16, 11..16, 1),
     ))));
+}
+
+// errors
+
+#[test]
+fn mismatched_parens() {
+    let mut lexer = Lexer::new("{)");
+
+    assert_eq!(lexer.next(), Some(Ok(Token::new(
+        TokenKind::Paren { raw: '{', depth: 0, kind: ParenKind::Open },
+        Span::new(0, 0..1, 0..1, 0),
+    ))));
+
+    assert_eq!(lexer.next(), Some(Err(Error::new(
+        ErrorKind::MismatchedParens('}', ')'),
+        Span::new(0, 1..2, 1..2, 0),
+    ))));
+
+    assert_eq!(lexer.next(), None);
+}
+
+#[test]
+fn missing_open_paren() {
+    let mut lexer = Lexer::new("}");
+
+    assert_eq!(lexer.next(), Some(Err(Error::new(
+        ErrorKind::MissingOpenParen('}'),
+        Span::new(0, 0..1, 0..1, 0),
+    ))));
+
+    assert_eq!(lexer.next(), None);
+}
+
+#[test]
+fn missing_close_paren() {
+    let mut lexer = Lexer::new("{");
+
+    assert_eq!(lexer.next(), Some(Ok(Token::new(
+        TokenKind::Paren { raw: '{', depth: 0, kind: ParenKind::Open },
+        Span::new(0, 0..1, 0..1, 0),
+    ))));
+
+    assert_eq!(lexer.next(), Some(Err(Error::new(
+        ErrorKind::MissingCloseParen('{'),
+        Span::new(0, 0..1, 0..1, 0),
+    ))));
+
+    assert_eq!(lexer.next(), None);
+}
+
+#[test]
+fn missing_digit_after_prefix() {
+    let mut lexer = Lexer::new("0x");
+
+    assert_eq!(lexer.next(), Some(Err(Error::new(
+        ErrorKind::MissingDigitAfterPrefix("0x".to_owned()),
+        Span::new(0, 0..2, 0..2, 0),
+    ))));
+
+    assert_eq!(lexer.next(), None);
+}
+
+#[test]
+fn missing_close_quote() {
+    let mut lexer = Lexer::new("\"abc");
+
+    assert_eq!(lexer.next(), Some(Err(Error::new(
+        ErrorKind::MissingCloseQuote("\"abc".to_owned()),
+        Span::new(0, 0..4, 0..4, 0),
+    ))));
+
+    assert_eq!(lexer.next(), None);
+}
+
+#[test]
+fn invalid_esc_seq() {
+    // single
+    let mut lexer = Lexer::new("\"\\z\"");
+
+    assert_eq!(lexer.next(), Some(Err(Error::new(
+        ErrorKind::InvalidEscSeq(vec!["\\z".to_owned()]),
+        Span::new(0, 0..4, 0..4, 0),
+    ))));
+
+    assert_eq!(lexer.next(), None);
+
+    // multiple
+    let mut lexer = Lexer::new("\"\\z\\a\\1\"");
+
+    assert_eq!(lexer.next(), Some(Err(Error::new(
+        ErrorKind::InvalidEscSeq(vec!["\\z".to_owned(), "\\a".to_owned(), "\\1".to_owned()]),
+        Span::new(0, 0..8, 0..8, 0),
+    ))));
+
+    assert_eq!(lexer.next(), None);
 }

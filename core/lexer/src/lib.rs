@@ -7,12 +7,12 @@ use error::*;
 mod tests;
 
 #[derive(Debug, Clone)]
-pub struct CodeIter<'a> {
+pub struct CodeIterator<'a> {
     curr: std::iter::Peekable<std::str::Chars<'a>>,
     count: usize,
 }
 
-impl<'a> CodeIter<'a> {
+impl<'a> CodeIterator<'a> {
     pub fn new(code: &'a str) -> Self {
         Self {
             curr: code.chars().peekable(),
@@ -32,7 +32,7 @@ impl<'a> CodeIter<'a> {
     }
 }
 
-impl<'a> std::iter::Iterator for CodeIter<'a> {
+impl<'a> std::iter::Iterator for CodeIterator<'a> {
     type Item = char;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -43,7 +43,7 @@ impl<'a> std::iter::Iterator for CodeIter<'a> {
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
-    curr: CodeIter<'a>,
+    curr: CodeIterator<'a>,
     line: usize,
     col: usize,
     codepoint: usize,
@@ -54,7 +54,7 @@ pub struct Lexer<'a> {
 impl<'a> Lexer<'a> {
     pub fn new(src: &'a str) -> Self {
         Self {
-            curr: CodeIter::new(src),
+            curr: CodeIterator::new(src),
             line: 0,
             col: 0,
             codepoint: 0,
@@ -66,7 +66,7 @@ impl<'a> Lexer<'a> {
     fn tokenize_open_paren(&mut self, first: char) -> Result<Token, Error> {
         self.paren_stack.push(first);
         
-        Ok(Token::new_kind(TokenKind::Paren {
+        Ok(Token::new_value(TokenKind::Paren {
             raw: first,
             depth: self.paren_stack.len() - 1,
             kind: ParenKind::Open,
@@ -77,19 +77,22 @@ impl<'a> Lexer<'a> {
         match self.paren_stack.last() {
             Some(&open) if Self::are_parens_match(open, first) => {
                 self.paren_stack.pop();
-                Ok(Token::new_kind(TokenKind::Paren {
+                Ok(Token::new_value(TokenKind::Paren {
                     raw: first,
                     depth: self.paren_stack.len(),
                     kind: ParenKind::Close,
                 }))
             },
-            Some(&open) => Err(Error::new_kind(
-                ErrorKind::MismatchedParens(
-                    Self::get_matching_paren(open).unwrap(),
-                    first,
-                ),
-            )),
-            None => Err(Error::new_kind(
+            Some(&open) => {
+                self.paren_stack.pop();
+                Err(Error::new_value(
+                    ErrorKind::MismatchedParens(
+                        Self::get_matching_paren(open).unwrap(),
+                        first,
+                    ),
+                ))
+            },
+            None => Err(Error::new_value(
                 ErrorKind::MissingOpenParen(first),
             )),
         }
@@ -135,7 +138,7 @@ impl<'a> Lexer<'a> {
                     raw.push(c);
                 },
                 Some(&c) if c.is_digit(radix) => raw.push(c),
-                _ => return Err(Error::new_kind(
+                _ => return Err(Error::new_value(
                     ErrorKind::MissingDigitAfterPrefix(prefix.clone()),
                 )),
             }
@@ -153,7 +156,7 @@ impl<'a> Lexer<'a> {
                         kind = LitKind::Float { dot_pos: Some(raw.len()), exp_pos: None };
                         raw.push(c);
                     } else {
-                        return Ok(Token::new_kind(
+                        return Ok(Token::new_value(
                             TokenKind::Lit { raw, prefix, suffix, kind },
                         ));
                     }
@@ -197,7 +200,7 @@ impl<'a> Lexer<'a> {
             self.curr.next();
         }
 
-        Ok(Token::new_kind(
+        Ok(Token::new_value(
             TokenKind::Lit { raw, prefix, suffix, kind },
         ))
     }
@@ -217,7 +220,7 @@ impl<'a> Lexer<'a> {
             self.curr.next();
         }
 
-        Ok(Token::new_kind(
+        Ok(Token::new_value(
             TokenKind::Punc { raw },
         ))
     }
@@ -255,9 +258,8 @@ impl<'a> Lexer<'a> {
                             raw.push(c);
                         },
                         None => {
-                            self.curr.next();
-                            return Err(Error::new_kind(
-                                ErrorKind::MissingCloseQuote(raw),
+                            return Err(Error::new_value(
+                                ErrorKind::MissingCloseQuote(prefix + &first.to_string() + &raw),
                             ));
                         },
                     }
@@ -268,9 +270,8 @@ impl<'a> Lexer<'a> {
             self.curr.next();
 
             if self.curr.peek().is_none() {
-                self.curr.next();
-                return Err(Error::new_kind(
-                    ErrorKind::MissingCloseQuote(raw),
+                return Err(Error::new_value(
+                    ErrorKind::MissingCloseQuote(prefix + &first.to_string() + &raw),
                 ))
             }
         }
@@ -288,11 +289,11 @@ impl<'a> Lexer<'a> {
         }
 
         if let Some(seqs) = esc_seq_err {
-            Err(Error::new_kind(
-                ErrorKind::InvalidEscapeSequence(seqs),
+            Err(Error::new_value(
+                ErrorKind::InvalidEscSeq(seqs),
             ))
         } else {
-            Ok(Token::new_kind(
+            Ok(Token::new_value(
                 TokenKind::Lit { raw, prefix, suffix, kind: LitKind::Quote { quote: first } },
             ))
         }
@@ -313,7 +314,7 @@ impl<'a> Lexer<'a> {
             self.curr.next();
         }
 
-        Ok(Token::new_kind(
+        Ok(Token::new_value(
             TokenKind::Id { raw },
         ))
     }
@@ -365,28 +366,46 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let dist_from_prev = self.ignore_whitespaces();
 
-        let tok = self.curr.next().map(|c| match c {
-            c if ['(', '{', '['].contains(&c) => self.tokenize_open_paren(c),
-            c if [')', '}', ']'].contains(&c) => self.tokenize_close_paren(c),
-            '0'..='9' => self.tokenize_num(c),
-            '.' => match self.curr.peek() {
-                Some(&c) if c.is_digit(10) => self.tokenize_num('.'),
-                _ => self.tokenize_punc('.'),
-            },
-            c @ ('"' | '\'') => self.tokenize_quote(c, "".to_owned()),
-            c if c != '_' && c.is_ascii_punctuation() => self.tokenize_punc(c),
-            c if !c.is_ascii_whitespace() => self.tokenize_id(c),
-            _ => unreachable!(),
-        });
+        let tok = self.curr
+            .next()
+            .map(|c| match c {
+                c if ['(', '{', '['].contains(&c) => self.tokenize_open_paren(c),
+                c if [')', '}', ']'].contains(&c) => self.tokenize_close_paren(c),
+                '0'..='9' => self.tokenize_num(c),
+                '.' => match self.curr.peek() {
+                    Some(&c) if c.is_digit(10) => self.tokenize_num('.'),
+                    _ => self.tokenize_punc('.'),
+                },
+                c @ ('"' | '\'') => self.tokenize_quote(c, "".to_owned()),
+                c if c != '_' && c.is_ascii_punctuation() => self.tokenize_punc(c),
+                c if !c.is_ascii_whitespace() => self.tokenize_id(c),
+                _ => unreachable!(),
+            });
 
         let count = self.curr.get_count();
-        self.col += count;
-        self.codepoint += count;
+
+        let tok = match tok {
+            None => {
+                if !self.paren_stack.is_empty() {
+                    let paren = self.paren_stack.pop().unwrap();
+                    Some(Err(Error::new_value(
+                        ErrorKind::MissingCloseParen(paren),
+                    )))
+                } else {
+                    None
+                }
+            },
+            Some(_) => {
+                self.col += count;
+                self.codepoint += count;
+                tok
+            },
+        };
 
         tok
             .map(|tok| tok
                 .map(|tok| Token::new(
-                    tok.kind,
+                    tok.value,
                     Span {
                         line: self.line,
                         col: self.col - count..self.col,
@@ -395,7 +414,7 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
                     },
                 ))
                 .map_err(|err| Error::new(
-                    err.kind,
+                    err.value,
                     Span {
                         line: self.line,
                         col: self.col - count..self.col,
