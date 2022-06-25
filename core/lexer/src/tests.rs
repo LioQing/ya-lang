@@ -7,52 +7,52 @@ fn parens() {
     let mut lexer = Lexer::new("()[({}){}]");
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '(', depth: 0, kind: ParenKind::Open },
+        TokenKind::Brac { raw: '(', depth: 0, kind: BracKind::Open },
         Span::new(0, 0..1, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: ')', depth: 0, kind: ParenKind::Close },
+        TokenKind::Brac { raw: ')', depth: 0, kind: BracKind::Close },
         Span::new(0, 1..2, 1..2, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '[', depth: 0, kind: ParenKind::Open },
+        TokenKind::Brac { raw: '[', depth: 0, kind: BracKind::Open },
         Span::new(0, 2..3, 2..3, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '(', depth: 1, kind: ParenKind::Open },
+        TokenKind::Brac { raw: '(', depth: 1, kind: BracKind::Open },
         Span::new(0, 3..4, 3..4, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '{', depth: 2, kind: ParenKind::Open },
+        TokenKind::Brac { raw: '{', depth: 2, kind: BracKind::Open },
         Span::new(0, 4..5, 4..5, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '}', depth: 2, kind: ParenKind::Close },
+        TokenKind::Brac { raw: '}', depth: 2, kind: BracKind::Close },
         Span::new(0, 5..6, 5..6, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: ')', depth: 1, kind: ParenKind::Close },
+        TokenKind::Brac { raw: ')', depth: 1, kind: BracKind::Close },
         Span::new(0, 6..7, 6..7, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '{', depth: 1, kind: ParenKind::Open },
+        TokenKind::Brac { raw: '{', depth: 1, kind: BracKind::Open },
         Span::new(0, 7..8, 7..8, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '}', depth: 1, kind: ParenKind::Close },
+        TokenKind::Brac { raw: '}', depth: 1, kind: BracKind::Close },
         Span::new(0, 8..9, 8..9, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: ']', depth: 0, kind: ParenKind::Close },
+        TokenKind::Brac { raw: ']', depth: 0, kind: BracKind::Close },
         Span::new(0, 9..10, 9..10, 0),
     ))));
 
@@ -217,12 +217,12 @@ fn mismatched_parens() {
     let mut lexer = Lexer::new("{)");
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '{', depth: 0, kind: ParenKind::Open },
+        TokenKind::Brac { raw: '{', depth: 0, kind: BracKind::Open },
         Span::new(0, 0..1, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
-        ErrorKind::MismatchedParens('}', ')'),
+        ErrorKind::MismatchedBracs('}', ')'),
         Span::new(0, 1..2, 1..2, 0),
     ))));
 
@@ -234,7 +234,7 @@ fn missing_open_paren() {
     let mut lexer = Lexer::new("}");
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
-        ErrorKind::MissingOpenParen('}'),
+        ErrorKind::MissingOpenBrac('}'),
         Span::new(0, 0..1, 0..1, 0),
     ))));
 
@@ -246,12 +246,12 @@ fn missing_close_paren() {
     let mut lexer = Lexer::new("{");
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Paren { raw: '{', depth: 0, kind: ParenKind::Open },
+        TokenKind::Brac { raw: '{', depth: 0, kind: BracKind::Open },
         Span::new(0, 0..1, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
-        ErrorKind::MissingCloseParen('{'),
+        ErrorKind::MissingCloseBrac('{'),
         Span::new(0, 0..1, 0..1, 0),
     ))));
 

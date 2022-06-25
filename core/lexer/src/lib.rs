@@ -6,6 +6,7 @@ use error::*;
 #[cfg(test)]
 mod tests;
 
+/// Iterator used for iterating through codes.
 #[derive(Debug, Clone)]
 pub struct CodeIterator<'a> {
     curr: std::iter::Peekable<std::str::Chars<'a>>,
@@ -13,6 +14,7 @@ pub struct CodeIterator<'a> {
 }
 
 impl<'a> CodeIterator<'a> {
+    /// Create from a string.
     pub fn new(code: &'a str) -> Self {
         Self {
             curr: code.chars().peekable(),
@@ -20,11 +22,12 @@ impl<'a> CodeIterator<'a> {
         }
     }
 
+    /// Peek the next character without advancing the iterator.
     pub fn peek(&mut self) -> Option<&char> {
         self.curr.peek()
     }
 
-    // reteurn and then reset count
+    /// Get and reset the advanced character count.
     pub fn get_count(&mut self) -> usize {
         let count = self.count;
         self.count = 0;
@@ -41,6 +44,7 @@ impl<'a> std::iter::Iterator for CodeIterator<'a> {
     }
 }
 
+/// Lexer for Ya.
 #[derive(Debug)]
 pub struct Lexer<'a> {
     curr: CodeIterator<'a>,
@@ -48,10 +52,11 @@ pub struct Lexer<'a> {
     col: usize,
     codepoint: usize,
 
-    paren_stack: Vec<char>,
+    brac_stack: Vec<char>,
 }
 
 impl<'a> Lexer<'a> {
+    /// Create from a string.
     pub fn new(src: &'a str) -> Self {
         Self {
             curr: CodeIterator::new(src),
@@ -59,47 +64,52 @@ impl<'a> Lexer<'a> {
             col: 0,
             codepoint: 0,
 
-            paren_stack: vec![],
+            brac_stack: vec![],
         }
     }
 
-    fn tokenize_open_paren(&mut self, first: char) -> Result<Token, Error> {
-        self.paren_stack.push(first);
+    /// Tokenize open bracket.
+    /// One of `{`, `[`, `(`.
+    fn tokenize_open_brac(&mut self, first: char) -> Result<Token, Error> {
+        self.brac_stack.push(first);
         
-        Ok(Token::new_value(TokenKind::Paren {
+        Ok(Token::new_value(TokenKind::Brac {
             raw: first,
-            depth: self.paren_stack.len() - 1,
-            kind: ParenKind::Open,
+            depth: self.brac_stack.len() - 1,
+            kind: BracKind::Open,
         }))
     }
 
-    fn tokenize_close_paren(&mut self, first: char) -> Result<Token, Error> {        
-        match self.paren_stack.last() {
-            Some(&open) if Self::are_parens_match(open, first) => {
-                self.paren_stack.pop();
-                Ok(Token::new_value(TokenKind::Paren {
+    /// Tokenize close bracket.
+    /// One of `}`, `]`, `)`.
+    fn tokenize_close_brac(&mut self, first: char) -> Result<Token, Error> {        
+        match self.brac_stack.last() {
+            Some(&open) if Self::are_bracs_match(open, first) => {
+                self.brac_stack.pop();
+                Ok(Token::new_value(TokenKind::Brac {
                     raw: first,
-                    depth: self.paren_stack.len(),
-                    kind: ParenKind::Close,
+                    depth: self.brac_stack.len(),
+                    kind: BracKind::Close,
                 }))
             },
             Some(&open) => {
-                self.paren_stack.pop();
+                self.brac_stack.pop();
                 Err(Error::new_value(
-                    ErrorKind::MismatchedParens(
-                        Self::get_matching_paren(open).unwrap(),
+                    ErrorKind::MismatchedBracs(
+                        Self::get_matching_brac(open).unwrap(),
                         first,
                     ),
                 ))
             },
             None => Err(Error::new_value(
-                ErrorKind::MissingOpenParen(first),
+                ErrorKind::MissingOpenBrac(first),
             )),
         }
     }
 
+    /// Tokenize number literals.
     fn tokenize_num(&mut self, first: char) -> Result<Token, Error> {
-        /** numeric prefix for radix, must start with a digit of radix 10 and have a length greater than 1 */
+        // numeric prefix for radix, must start with a digit of radix 10 and have a length greater than 1
         const NUMERIC_RADIX_PREFIX: &'static [(&'static str, u32)] = &[("0x", 16), ("0o", 8), ("0b", 2)];
 
         let mut raw = String::new();
@@ -205,6 +215,7 @@ impl<'a> Lexer<'a> {
         ))
     }
 
+    /// Tokenize punctuation.
     fn tokenize_punc(&mut self, first: char) -> Result<Token, Error> {
         let mut raw = first.to_string();
         
@@ -225,6 +236,7 @@ impl<'a> Lexer<'a> {
         ))
     }
 
+    /// Tokenize quoted literals (string/char).
     fn tokenize_quote(&mut self, first: char, prefix: String) -> Result<Token, Error> {        
         let mut raw = String::new();
         let mut suffix = String::new();
@@ -299,6 +311,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Tokenize identifiers.
     fn tokenize_id(&mut self, first: char) -> Result<Token, Error> {
         let mut raw = first.to_string();
         
@@ -319,11 +332,14 @@ impl<'a> Lexer<'a> {
         ))
     }
 
+    /// Check if next character is whitespace.
     fn is_next_whitespace(&mut self) -> bool {
         self.curr.peek().map_or(false, |c| c.is_ascii_whitespace())
     }
 
-    fn ignore_whitespaces(&mut self) -> usize {
+    /// Skip all following whitespaces.
+    /// Returns number of skipped whitespace.
+    fn skip_whitespaces(&mut self) -> usize {
         while self.is_next_whitespace() {
             match self.curr.next() {
                 Some(c) if c == '\n' => {
@@ -340,14 +356,16 @@ impl<'a> Lexer<'a> {
         count
     }
 
-    fn are_parens_match(open: char, close: char) -> bool {
+    /// Check if two bracket characters are matching.
+    fn are_bracs_match(open: char, close: char) -> bool {
         match (open, close) {
             ('(', ')') | ('[', ']') | ('{', '}') => true,
             _ => false,
         }
     }
 
-    fn get_matching_paren(c: char) -> Option<char> {
+    /// Get the matching bracket character.
+    fn get_matching_brac(c: char) -> Option<char> {
         match c {
             '(' => Some(')'),
             '[' => Some(']'),
@@ -364,13 +382,14 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
     type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let dist_from_prev = self.ignore_whitespaces();
+        let dist_from_prev = self.skip_whitespaces();
 
+        // determine token type and tokenize
         let tok = self.curr
             .next()
             .map(|c| match c {
-                c if ['(', '{', '['].contains(&c) => self.tokenize_open_paren(c),
-                c if [')', '}', ']'].contains(&c) => self.tokenize_close_paren(c),
+                c if ['(', '{', '['].contains(&c) => self.tokenize_open_brac(c),
+                c if [')', '}', ']'].contains(&c) => self.tokenize_close_brac(c),
                 '0'..='9' => self.tokenize_num(c),
                 '.' => match self.curr.peek() {
                     Some(&c) if c.is_digit(10) => self.tokenize_num('.'),
@@ -386,10 +405,10 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
 
         let tok = match tok {
             None => {
-                if !self.paren_stack.is_empty() {
-                    let paren = self.paren_stack.pop().unwrap();
+                if !self.brac_stack.is_empty() {
+                    let brac = self.brac_stack.pop().unwrap();
                     Some(Err(Error::new_value(
-                        ErrorKind::MissingCloseParen(paren),
+                        ErrorKind::MissingCloseBrac(brac),
                     )))
                 } else {
                     None
@@ -402,6 +421,7 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
             },
         };
 
+        // set the span
         tok
             .map(|tok| tok
                 .map(|tok| Token::new(

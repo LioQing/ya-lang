@@ -1,15 +1,16 @@
 use thiserror::Error;
 
+/// Lexer error kinds.
 #[derive(Error, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ErrorKind {
-    #[error("Mismatched parentheses, expected `{0}`, found `{1}`")]
-    MismatchedParens(char, char),
+    #[error("Mismatched brackets, expected `{0}`, found `{1}`")]
+    MismatchedBracs(char, char),
 
-    #[error("Missing opening parenthesis for `{0}`")]
-    MissingOpenParen(char),
+    #[error("Missing opening bracket for `{0}`")]
+    MissingOpenBrac(char),
 
-    #[error("Missing closing parenthesis for `{0}`")]
-    MissingCloseParen(char),
+    #[error("Missing closing bracket for `{0}`")]
+    MissingCloseBrac(char),
 
     #[error("Missing digit after numeric literal prefix `{0}`")]
     MissingDigitAfterPrefix(String),
@@ -21,4 +22,5 @@ pub enum ErrorKind {
     InvalidEscSeq(Vec<String>),
 }
 
+/// Lexer error.
 pub type Error = token::Spanned<ErrorKind>;

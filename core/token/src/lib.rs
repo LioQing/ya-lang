@@ -1,3 +1,5 @@
+/// Span of source code.
+/// Used to store location of tokens and errors in source code.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Span {
     pub line: usize,
@@ -17,6 +19,7 @@ impl Span {
     }
 }
 
+/// A wrapper to store any value with span information.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Spanned<T> {
     pub value: T,
@@ -45,10 +48,11 @@ where
     }
 }
 
+/// Token kinds.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum TokenKind {
-    /** parentheses */
-    Paren { raw: char, depth: usize, kind: ParenKind },
+    /** brackets */
+    Brac { raw: char, depth: usize, kind: BracKind },
 
     /** separators */
     Sep { raw: char },
@@ -63,12 +67,14 @@ pub enum TokenKind {
     Id { raw: String },
 }
 
+/// Bracket kinds.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum ParenKind {
+pub enum BracKind {
     Open,
     Close,
 }
 
+/// Literal kinds.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum LitKind {
     Integer,
@@ -76,4 +82,5 @@ pub enum LitKind {
     Quote { quote: char },
 }
 
+/// Token.
 pub type Token = Spanned<TokenKind>;
