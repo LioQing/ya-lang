@@ -52,22 +52,30 @@ where
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum TokenKind {
     /** brackets */
-    Brac { raw: char, depth: usize, kind: BracKind },
+    Brac(BracToken),
 
     /** separators */
-    Sep { raw: char },
+    Sep(char),
 
     /** numeric/string/char literals */
-    Lit { raw: String, prefix: String, suffix: String, kind: LitKind },
+    Lit(LitToken),
 
     /** punctuation */
-    Punc { raw: String },
+    Punc(String),
 
     /** identifiers */
-    Id { raw: String },
+    Id(String),
 
     /** keywords */
-    Kw { raw: String }
+    Kw(String),
+}
+
+// Bracket token.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct BracToken {
+    pub raw: char,
+    pub depth: usize,
+    pub kind: BracKind,
 }
 
 /// Bracket kinds.
@@ -77,12 +85,33 @@ pub enum BracKind {
     Close,
 }
 
+/// Literal token.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct LitToken {
+    pub raw: String,
+    pub prefix: String,
+    pub suffix: String,
+    pub kind: LitKind,
+}
+
+impl LitToken {
+    pub fn new(raw: String, kind: LitKind) -> Self {
+        Self {
+            raw,
+            prefix: String::new(),
+            suffix: String::new(),
+            kind,
+        }
+    }
+}
+
 /// Literal kinds.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum LitKind {
     Integer,
     Float { dot_pos: Option<usize>, exp_pos: Option<usize> },
     Quote { quote: char },
+    Bool,
 }
 
 /// Token.

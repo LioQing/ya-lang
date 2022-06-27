@@ -1,3 +1,4 @@
+use super::*;
 use thiserror::Error;
 
 /// Lexer error kinds.
@@ -23,4 +24,4 @@ pub enum ErrorKind {
 }
 
 /// Lexer error.
-pub type Error = token::Spanned<ErrorKind>;
+pub type Error = Spanned<ErrorKind>;

@@ -1,11 +1,16 @@
-// use token::*;
+use token::*;
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
-// pub mod error;
-// use error::*;
+pub mod expr;
+pub use expr::*;
 
-// pub struct Parser {
+pub mod error;
+pub use error::*;
 
+// pub fn parse(code: &str) -> Vec<Expr> {
+//     let mut lexer = lexer::Lexer::new(code).peekable();
+
+//     unimplemented!()
 // }

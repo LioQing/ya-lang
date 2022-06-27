@@ -4,7 +4,7 @@ use token::*;
 mod tests;
 
 pub mod error;
-use error::*;
+pub use error::*;
 
 /// Iterator used for iterating through codes.
 #[derive(Debug, Clone)]
@@ -73,11 +73,11 @@ impl<'a> Lexer<'a> {
     fn tokenize_open_brac(&mut self, first: char) -> Result<Token, Error> {
         self.brac_stack.push(first);
         
-        Ok(Token::new_value(TokenKind::Brac {
+        Ok(Token::new_value(TokenKind::Brac(BracToken {
             raw: first,
             depth: self.brac_stack.len() - 1,
             kind: BracKind::Open,
-        }))
+        })))
     }
 
     /// Tokenize close bracket.
@@ -86,11 +86,11 @@ impl<'a> Lexer<'a> {
         match self.brac_stack.last() {
             Some(&open) if Self::are_bracs_match(open, first) => {
                 self.brac_stack.pop();
-                Ok(Token::new_value(TokenKind::Brac {
+                Ok(Token::new_value(TokenKind::Brac(BracToken {
                     raw: first,
                     depth: self.brac_stack.len(),
                     kind: BracKind::Close,
-                }))
+                })))
             },
             Some(&open) => {
                 self.brac_stack.pop();
@@ -167,7 +167,7 @@ impl<'a> Lexer<'a> {
                         raw.push(c);
                     } else {
                         return Ok(Token::new_value(
-                            TokenKind::Lit { raw, prefix, suffix, kind },
+                            TokenKind::Lit(LitToken { raw, prefix, suffix, kind }),
                         ));
                     }
                 },
@@ -211,7 +211,7 @@ impl<'a> Lexer<'a> {
         }
 
         Ok(Token::new_value(
-            TokenKind::Lit { raw, prefix, suffix, kind },
+            TokenKind::Lit(LitToken { raw, prefix, suffix, kind }),
         ))
     }
 
@@ -232,7 +232,7 @@ impl<'a> Lexer<'a> {
         }
 
         Ok(Token::new_value(
-            TokenKind::Punc { raw },
+            TokenKind::Punc(raw),
         ))
     }
 
@@ -306,7 +306,7 @@ impl<'a> Lexer<'a> {
             ))
         } else {
             Ok(Token::new_value(
-                TokenKind::Lit { raw, prefix, suffix, kind: LitKind::Quote { quote: first } },
+                TokenKind::Lit(LitToken { raw, prefix, suffix, kind: LitKind::Quote { quote: first } }),
             ))
         }
     }
@@ -331,9 +331,21 @@ impl<'a> Lexer<'a> {
             "let", "const",
         ];
 
+        const BOOL_KW: &'static [&'static str] = &[
+            "true", "false",
+        ];
+
         Ok(Token::new_value(match KEYWORDS.contains(&raw.as_str()) {
-            true => TokenKind::Kw { raw },
-            false => TokenKind::Id { raw },
+            true => TokenKind::Kw(raw),
+            false => match BOOL_KW.contains(&raw.as_str()) {
+                true => TokenKind::Lit(LitToken {
+                    raw,
+                    prefix: "".to_owned(),
+                    suffix: "".to_owned(),
+                    kind: LitKind::Bool,
+                }),
+                false => TokenKind::Id(raw),
+            },
         }))
     }
 
