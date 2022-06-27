@@ -68,7 +68,7 @@ fn num_lit() {
             raw: "1234".to_string(),
             prefix: "".to_string(),
             suffix: "".to_string(),
-            kind: LitKind::Integer,
+            kind: LitKind::Int,
         }),
         Span::new(0, 0..4, 0..4, 0),
     ))));
@@ -98,7 +98,7 @@ fn num_lit() {
             raw: "1ab".to_string(),
             prefix: "0x".to_string(),
             suffix: "".to_string(),
-            kind: LitKind::Integer,
+            kind: LitKind::Int,
         }),
         Span::new(0, 16..21, 16..21, 1),
     ))));
@@ -108,7 +108,7 @@ fn num_lit() {
             raw: "101".to_string(),
             prefix: "0b".to_string(),
             suffix: "".to_string(),
-            kind: LitKind::Integer,
+            kind: LitKind::Int,
         }),
         Span::new(0, 22..27, 22..27, 1),
     ))));
@@ -118,7 +118,7 @@ fn num_lit() {
             raw: "123".to_string(),
             prefix: "".to_string(),
             suffix: "f32".to_string(),
-            kind: LitKind::Integer,
+            kind: LitKind::Int,
         }),
         Span::new(0, 28..34, 28..34, 1),
     ))));
@@ -128,7 +128,7 @@ fn num_lit() {
             raw: "123".to_string(),
             prefix: "0o".to_string(),
             suffix: "i32".to_string(),
-            kind: LitKind::Integer,
+            kind: LitKind::Int,
         }),
         Span::new(0, 35..43, 35..43, 1),
     ))));

@@ -115,7 +115,7 @@ impl<'a> Lexer<'a> {
         let mut raw = String::new();
         let mut prefix = String::new();
         let mut suffix = String::new();
-        let mut kind = LitKind::Integer;
+        let mut kind = LitKind::Int;
 
         let mut radix = 10;
 
@@ -162,7 +162,7 @@ impl<'a> Lexer<'a> {
                     raw.push(c);
                 },
                 '.' => {
-                    if let LitKind::Integer = kind {
+                    if let LitKind::Int = kind {
                         kind = LitKind::Float { dot_pos: Some(raw.len()), exp_pos: None };
                         raw.push(c);
                     } else {
@@ -184,7 +184,7 @@ impl<'a> Lexer<'a> {
                         LitKind::Float { dot_pos, exp_pos: None } => {
                             kind = LitKind::Float { dot_pos, exp_pos: Some(raw.len()) };
                         },
-                        LitKind::Integer => {
+                        LitKind::Int => {
                             kind = LitKind::Float { dot_pos: None, exp_pos: Some(raw.len()) };
                         },
                         _ => break,

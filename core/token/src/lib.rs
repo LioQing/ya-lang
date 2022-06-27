@@ -108,7 +108,7 @@ impl LitToken {
 /// Literal kinds.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum LitKind {
-    Integer,
+    Int,
     Float { dot_pos: Option<usize>, exp_pos: Option<usize> },
     Quote { quote: char },
     Bool,

@@ -28,13 +28,13 @@ pub type Expr = Spanned<ExprKind>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ParenExpr {
-    pub expr: Box<Expr>,
+    pub expr: Box<Result<Expr, Error>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BlockExpr {
-    pub stmts: Vec<Expr>,
-    pub expr: Option<Box<Expr>>,
+    pub stmts: Vec<Result<Expr, Error>>,
+    pub expr: Option<Box<Result<Expr, Error>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -42,14 +42,14 @@ pub struct LetExpr {
     pub mutable: bool,
     pub id: String,
     pub ty: Option<String>,
-    pub expr: Option<Box<Expr>>,
+    pub expr: Option<Box<Result<Expr, Error>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ConstExpr {
     pub id: String,
     pub ty: String,
-    pub expr: Box<Expr>,
+    pub expr: Box<Result<Expr, Error>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -57,5 +57,5 @@ pub struct FnExpr {
     pub args: Vec<(String, String)>,
     pub ret_ty: Option<String>,
     pub block: BlockExpr,
-    pub expr: Option<Box<Expr>>,
+    pub expr: Option<Box<Result<Expr, Error>>>,
 }
