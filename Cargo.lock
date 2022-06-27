@@ -40,6 +40,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "syn_parser"
+version = "0.1.0"
+dependencies = [
+ "lexer",
+ "thiserror",
+ "token",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -3,7 +3,7 @@ use super::*;
 // valid
 
 #[test]
-fn parens() {
+fn bracs() {
     let mut lexer = Lexer::new("()[({}){}]");
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -181,6 +181,23 @@ fn id() {
 }
 
 #[test]
+fn kw() {
+    let mut lexer = Lexer::new("let const");
+
+    assert_eq!(lexer.next(), Some(Ok(Token::new(
+        TokenKind::Kw { raw: "let".to_string() },
+        Span::new(0, 0..3, 0..3, 0),
+    ))));
+
+    assert_eq!(lexer.next(), Some(Ok(Token::new(
+        TokenKind::Kw { raw: "const".to_string() },
+        Span::new(0, 4..9, 4..9, 1),
+    ))));
+
+    assert_eq!(lexer.next(), None);
+}
+
+#[test]
 fn punc() {
     let mut lexer = Lexer::new("- + += !&! .*!&@");
 
@@ -213,7 +230,7 @@ fn punc() {
 // errors
 
 #[test]
-fn mismatched_parens() {
+fn mismatched_bracs() {
     let mut lexer = Lexer::new("{)");
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -230,7 +247,7 @@ fn mismatched_parens() {
 }
 
 #[test]
-fn missing_open_paren() {
+fn missing_open_brac() {
     let mut lexer = Lexer::new("}");
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
@@ -242,7 +259,7 @@ fn missing_open_paren() {
 }
 
 #[test]
-fn missing_close_paren() {
+fn missing_close_brac() {
     let mut lexer = Lexer::new("{");
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(

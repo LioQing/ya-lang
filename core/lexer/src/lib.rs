@@ -1,10 +1,10 @@
 use token::*;
 
-pub mod error;
-use error::*;
-
 #[cfg(test)]
 mod tests;
+
+pub mod error;
+use error::*;
 
 /// Iterator used for iterating through codes.
 #[derive(Debug, Clone)]
@@ -311,8 +311,8 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Tokenize identifiers.
-    fn tokenize_id(&mut self, first: char) -> Result<Token, Error> {
+    /// Tokenize identifiers or keywords.
+    fn tokenize_id_or_kw(&mut self, first: char) -> Result<Token, Error> {
         let mut raw = first.to_string();
         
         while let Some(&c) = self.curr.peek() {
@@ -327,9 +327,14 @@ impl<'a> Lexer<'a> {
             self.curr.next();
         }
 
-        Ok(Token::new_value(
-            TokenKind::Id { raw },
-        ))
+        const KEYWORDS: &'static [&'static str] = &[
+            "let", "const",
+        ];
+
+        Ok(Token::new_value(match KEYWORDS.contains(&raw.as_str()) {
+            true => TokenKind::Kw { raw },
+            false => TokenKind::Id { raw },
+        }))
     }
 
     /// Check if next character is whitespace.
@@ -397,7 +402,7 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
                 },
                 c @ ('"' | '\'') => self.tokenize_quote(c, "".to_owned()),
                 c if c != '_' && c.is_ascii_punctuation() => self.tokenize_punc(c),
-                c if !c.is_ascii_whitespace() => self.tokenize_id(c),
+                c if !c.is_ascii_whitespace() => self.tokenize_id_or_kw(c),
                 _ => unreachable!(),
             });
 

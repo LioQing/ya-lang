@@ -65,6 +65,9 @@ pub enum TokenKind {
 
     /** identifiers */
     Id { raw: String },
+
+    /** keywords */
+    Kw { raw: String }
 }
 
 /// Bracket kinds.
