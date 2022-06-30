@@ -24,6 +24,23 @@ pub enum ExprKind {
     Fn(FnExpr),
 }
 
+impl ExprKind {
+    pub fn eq_patt(&self, other: &Self) -> bool {
+        use ExprKind::*;
+
+        match (&self, &other) {
+            (Lit(l1), Lit(l2)) => l1.eq_kind(l2),
+            (Id(_), Id(_))
+            | (Paren(_), Paren(_))
+            | (Block(_), Block(_))
+            | (Let(_), Let(_))
+            | (Const(_), Const(_))
+            | (Fn(_), Fn(_)) => true,
+            _ => false,
+        }
+    }
+}
+
 pub type Expr = Spanned<ExprKind>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

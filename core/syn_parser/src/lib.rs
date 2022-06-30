@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use token::*;
 
 #[cfg(test)]
@@ -15,9 +16,30 @@ pub enum StackItem {
     Expr(Result<Expr, Error>),
 }
 
+impl StackItem {
+    pub fn eq_patt(&self, other: &StackItem) -> bool {
+        match (&self, &other) {
+            (
+                &Self::Token(Ok(Token { value: a, .. })),
+                &Self::Token(Ok(Token { value: b, .. }))
+            ) => {
+                a.eq_patt(b)
+            },
+            (
+                &Self::Expr(Ok(Expr { value: a, .. })),
+                &Self::Expr(Ok(Expr { value: b, .. })),
+            ) => {
+                a.eq_patt(b)
+            },
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Parser<'a> {
     pub lexer: std::iter::Peekable<lexer::Lexer<'a>>,
+    pub patts: HashSet<Vec<StackItem>>,
 
     stack: Vec<StackItem>,
 }
@@ -26,94 +48,90 @@ impl<'a> Parser<'a> {
     pub fn new(code: &'a str) -> Parser<'a> {
         Parser {
             lexer: lexer::Lexer::new(code).peekable(),
+            patts: [].into(),
             stack: vec![],
         }
     }
 
-    fn token_to_expr(token: Result<Token, lexer::Error>) -> Option<Result<Expr, Error>> {
+    fn token_to_stack_item(token: Result<Token, lexer::Error>) -> StackItem {
         match token {
-            Ok(Token { value, span }) => match value {
-                TokenKind::Lit(lit) => Some(Ok(Expr::new(ExprKind::Lit(lit), span))),
-                TokenKind::Id(id) => Some(Ok(Expr::new(ExprKind::Id(id), span))),
-                _ => None,
-            },
-            Err(lexer::Error { value, span }) => Some(Err(Error::new(value.into(), span))),
+            Ok(Token {
+                value: TokenKind::Lit(lit),
+                span
+            }) => StackItem::Expr(Ok(Expr::new(ExprKind::Lit(lit), span))),
+            Ok(Token {
+                value: TokenKind::Id(id),
+                span
+            }) => StackItem::Expr(Ok(Expr::new(ExprKind::Id(id), span))),
+            tok => StackItem::Token(tok),
         }
     }
 
-    fn shift(&mut self) {
-        match self.lexer.next() {
-            Some(tok) => match Self::token_to_expr(tok.clone()) {
-                Some(expr) => self.stack.push(StackItem::Expr(expr)),
-                None => self.stack.push(StackItem::Token(tok)),
-            },
-            None => unreachable!(),
-        }
-    }
-
-    fn pr_reduce(&mut self) -> Option<Result<Expr, Error>> {
-        None
-    }
-}
-
-impl<'a> std::iter::Iterator for Parser<'a> {
-    type Item = Result<Expr, Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn parse(&mut self) {
         loop {
-            match (&self.stack[..], self.lexer.peek()) {
-                // reduce cases
-                
-                (
-                    &[_, _, ..],
-                    None,
-                ) => {
-                    return match self.pr_reduce() {
-                        Some(expr) => Some(expr),
-                        _ => Some(Err(Error::new_value(ErrorKind::UnknownSyntax))),
-                    }
-                }
-    
-                // default cases
-    
-                ( // nothing in stack, followed by nothing -> None
-                    &[],
-                    None,
-                ) => {
-                    return None
-                },
-                ( // one expr in stack, followed by anything -> return
-                    &[StackItem::Expr(_)],
-                    _,
-                ) => {
-                    match self.stack.pop().unwrap() {
-                        StackItem::Expr(expr) => return Some(expr),
-                        _ => unreachable!(),
-                    }
-                },
-                ( // anything in stack, followed by something -> shift
-                    _,
-                    Some(_),
-                ) => {
-                    self.shift()
-                },
+            // get next item
+            let next = match self.lexer.next() {
+                Some(next) => Some(Self::token_to_stack_item(next)),
+                None => None,
+            };
 
-                // Syntax Error
+            // shiftables
+            let shiftables = if let Some(next) = &next {
+                let next_stack = self.stack
+                    .iter()
+                    .chain(std::iter::once(next))
+                    .collect::<Vec<_>>();
 
-                (
-                    &[StackItem::Token(_)],
-                    None,
-                ) => {
-                    return match self.stack.pop().unwrap() {
-                        StackItem::Token(
-                            Ok(Token { span, .. })
-                            | Err(lexer::Error { span, .. })
-                        ) => {
-                                Some(Err(Error::new(ErrorKind::UnknownSyntax, span)))
-                        },
-                        _ => unreachable!(),
-                    }
+                self.patts
+                    .iter()
+                    .filter(|&patt| (0..next_stack.len())
+                        .rev()
+                        .take(patt.len())
+                        .rev()
+                        .any(|i| next_stack[i..]
+                            .iter()
+                            .zip(patt.iter())
+                            .all(|(&a, b)| a.eq_patt(b))
+                        )
+                    )
+                    .collect::<HashSet<_>>()
+            } else {
+                [].into()
+            };
+            
+            // reduce
+            let curr_stack = &self.stack;
+
+            let reducibles = self.patts
+                .iter()
+                .filter(|&patt| curr_stack
+                    .iter()
+                    .skip(match curr_stack.len().cmp(&patt.len()) {
+                        std::cmp::Ordering::Greater => curr_stack.len() - patt.len(),
+                        std::cmp::Ordering::Equal => 0,
+                        std::cmp::Ordering::Less => return false,
+                    })
+                    .zip(patt.iter())
+                    .all(|(a, b)| a.eq_patt(b))
+                )
+                .collect::<HashSet<_>>();
+
+            // debug
+            println!("{:?} {}", shiftables, shiftables.len());
+            println!("RE: {:?}\n", reducibles);
+
+            if shiftables.is_empty() {
+                match reducibles.len() {
+                    0 => panic!("no pattern found"),
+                    1 => (), // reduce
+                    _ => panic!("reduce-reduce conflict: {reducibles:#?}"),
                 }
+
+                if next.is_none() {
+                    break;
+                }
+            } else {
+                self.stack.push(next.unwrap());
             }
         }
     }
@@ -123,6 +141,7 @@ impl<'a> From<lexer::Lexer<'a>> for Parser<'a> {
     fn from(lexer: lexer::Lexer) -> Parser {
         Parser {
             lexer: lexer.peekable(),
+            patts: [].into(),
             stack: vec![],
         }
     }
