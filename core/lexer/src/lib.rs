@@ -3,7 +3,7 @@ use token::*;
 #[cfg(test)]
 mod tests;
 
-pub mod error;
+mod error;
 pub use error::*;
 
 /// Iterator used for iterating through codes.

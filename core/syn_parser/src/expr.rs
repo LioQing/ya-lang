@@ -20,25 +20,8 @@ pub enum ExprKind {
     /** <const> = const <id>: <ty> = <const expr> */
     Const(ConstExpr),
 
-    /** <fn> = ([[mut]? <id>: <ty>],*) [-> <ty>]? [<block> | => <expr>] */
-    Fn(FnExpr),
-}
-
-impl ExprKind {
-    pub fn eq_patt(&self, other: &Self) -> bool {
-        use ExprKind::*;
-
-        match (&self, &other) {
-            (Lit(l1), Lit(l2)) => l1.eq_kind(l2),
-            (Id(_), Id(_))
-            | (Paren(_), Paren(_))
-            | (Block(_), Block(_))
-            | (Let(_), Let(_))
-            | (Const(_), Const(_))
-            | (Fn(_), Fn(_)) => true,
-            _ => false,
-        }
-    }
+    /** <bin> = <expr> <punc as bin op> <expr> */
+    Bin(BinExpr),
 }
 
 pub type Expr = Spanned<ExprKind>;
@@ -57,22 +40,21 @@ pub struct BlockExpr {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct LetExpr {
     pub mutable: bool,
-    pub id: String,
-    pub ty: Option<String>,
+    pub id: SynResult<Spanned<String>>,
+    pub ty: SynResult<Option<Spanned<String>>>,
     pub expr: Option<Box<Result<Expr, Error>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ConstExpr {
-    pub id: String,
-    pub ty: String,
+    pub id: SynResult<Spanned<String>>,
+    pub ty: SynResult<Spanned<String>>,
     pub expr: Box<Result<Expr, Error>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct FnExpr {
-    pub args: Vec<(String, String)>,
-    pub ret_ty: Option<String>,
-    pub block: BlockExpr,
-    pub expr: Option<Box<Result<Expr, Error>>>,
+pub struct BinExpr {
+    pub lhs: Box<Result<Expr, Error>>,
+    pub op: SynResult<Spanned<String>>,
+    pub rhs: Box<Result<Expr, Error>>,
 }

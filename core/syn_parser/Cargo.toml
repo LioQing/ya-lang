@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 thiserror = "1.0.30"
+derivative = "2.2.0"
 token = { path = "../token" }
 lexer = { path = "../lexer" }

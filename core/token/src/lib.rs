@@ -70,24 +70,6 @@ pub enum TokenKind {
     Kw(String),
 }
 
-impl TokenKind {
-    pub fn eq_patt(&self, other: &Self) -> bool {
-        use TokenKind::*;
-        match (&self, &other) {
-            (
-                &Brac(BracToken { raw: r1, kind: k1, .. }),
-                &Brac(BracToken { raw: r2, kind: k2, .. }),
-            ) => r1 == r2 && k1 == k2,
-            (&Sep(c1), &Sep(c2)) => c1 == c2,
-            (&Lit(l1), &Lit(l2)) => l1.eq_kind(l2),
-            (&Kw(k1), &Kw(k2)) => k1 == k2,
-            (&Punc(_), &Punc(_))
-            | (&Id(_), &Id(_)) => true,
-            _ => false,
-        }
-    }
-}
-
 // Bracket token.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BracToken {
@@ -138,17 +120,6 @@ impl LitToken {
             prefix: String::new(),
             suffix: String::new(),
             kind,
-        }
-    }
-
-    pub fn eq_kind(&self, other: &Self) -> bool {
-        use LitKind::*;
-        match (&self.kind, &other.kind) {
-            (Int, Int)
-            | (Float { .. }, Float { .. })
-            | (Quote { .. }, Quote { .. })
-            | (Bool, Bool) => true,
-            _ => false,
         }
     }
 }
