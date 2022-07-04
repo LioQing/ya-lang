@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, hash::Hash};
 use token::*;
 
 #[cfg(test)]
@@ -6,6 +6,9 @@ mod tests;
 
 mod expr;
 pub use expr::*;
+
+mod stmts;
+pub use stmts::*;
 
 mod rule;
 pub use rule::*;
@@ -19,6 +22,8 @@ pub type SynResult<T> = Result<T, Error>;
 pub enum StackItem {
     Token(Token),
     Expr(Expr),
+    Stmts(Stmts),
+    Stmt(Stmt),
     Err(Error),
 }
 
@@ -27,51 +32,11 @@ impl StackItem {
         match &self {
             &Self::Token(Token { span, .. })
             | &Self::Expr(Expr { span, .. })
+            | &Self::Stmts(Stmts { span, .. })
+            | &Self::Stmt(Stmt { span, .. })
             | &Self::Err(Error { span, .. }) => {
                 span
             }
-        }
-    }
-
-    pub fn token(&self) -> &Token {
-        match self {
-            Self::Token(ref token) => token,
-            _ => panic!("not a token"),
-        }
-    }
-
-    pub fn token_mut(&mut self) -> &mut Token {
-        match self {
-            Self::Token(ref mut token) => token,
-            _ => panic!("not a token"),
-        }
-    }
-
-    pub fn expr(&self) -> &Expr {
-        match self {
-            Self::Expr(ref expr) => expr,
-            _ => panic!("not an expr"),
-        }
-    }
-
-    pub fn expr_mut(&mut self) -> &mut Expr {
-        match self {
-            Self::Expr(ref mut expr) => expr,
-            _ => panic!("not an expr"),
-        }
-    }
-
-    pub fn err(&self) -> &Error {
-        match self {
-            Self::Err(ref err) => err,
-            _ => panic!("not an error"),
-        }
-    }
-
-    pub fn err_mut(&mut self) -> &mut Error {
-        match self {
-            Self::Err(ref mut err) => err,
-            _ => panic!("not an error"),
         }
     }
 
@@ -88,6 +53,22 @@ impl StackItem {
             Self::Expr(expr) => Ok(expr),
             Self::Err(err) => Err(err),
             _ => panic!("not an expr or error"),
+        }
+    }
+
+    pub fn stmts_or_err(self) -> Result<Stmts, Error> {
+        match self {
+            Self::Stmts(stmts) => Ok(stmts),
+            Self::Err(err) => Err(err),
+            _ => panic!("not a stmts or error"),
+        }
+    }
+
+    pub fn stmt_or_err(self) -> Result<Stmt, Error> {
+        match self {
+            Self::Stmt(stmt) => Ok(stmt),
+            Self::Err(err) => Err(err),
+            _ => panic!("not a stmt or error"),
         }
     }
 }
@@ -170,7 +151,16 @@ impl<'a> Parser<'a> {
                         })
                         .zip(rule.patt.iter())
                         .all(|(a, b)| b.match_item(a))
-                    )
+                    );
+
+                let max_prec = reducibles
+                    .clone()
+                    .map(|rule| rule.prec)
+                    .max()
+                    .unwrap_or(0);
+                
+                let reducibles = reducibles
+                    .filter(|&rule| rule.prec == max_prec)
                     .collect::<HashSet<_>>();
 
                 // debug
@@ -186,22 +176,9 @@ impl<'a> Parser<'a> {
                         let rule = reducibles.into_iter().next().unwrap();
                         let skip = self.stack.len() - rule.patt.len();
 
-                        let start = self.stack.iter().skip(skip).next().unwrap();
-                        let end = self.stack.last().unwrap();
+                        let item = (rule.reduce)(&self.stack[skip..]).into();
 
-                        let span = Span::new(
-                            start.span().line,
-                            start.span().col.start..end.span().col.end,
-                            start.span().codepoint.start..end.span().codepoint.end,
-                            start.span().dist_from_prev,
-                        );
-
-                        let expr = Expr::new(
-                            (rule.to_expr)(&self.stack[skip..]),
-                            span,
-                        );
-
-                        self.stack.splice(skip.., std::iter::once(StackItem::Expr(expr)));
+                        self.stack.splice(skip.., std::iter::once(item));
                         reduced = true;
                     },
                     _ => panic!("reduce-reduce conflict: {reducibles:#?}"),

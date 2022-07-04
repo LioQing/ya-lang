@@ -3,7 +3,7 @@
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Span {
     pub line: usize,
-    pub col: std::ops::Range<usize>,
+    pub col: usize,
     pub codepoint: std::ops::Range<usize>,
     pub dist_from_prev: usize,
 }
@@ -11,11 +11,25 @@ pub struct Span {
 impl Span {
     pub fn new(
         line: usize,
-        col: std::ops::Range<usize>,
+        col: usize,
         codepoint: std::ops::Range<usize>,
         dist_from_prev: usize,
     ) -> Self {
         Self { line, col, codepoint, dist_from_prev }
+    }
+
+    /// Return a span starting at the first span to the end of the last span.
+    pub fn merge(&self, other: &Span) -> Self {
+        if self.codepoint.start > other.codepoint.start {
+            return other.merge(self);
+        }
+
+        Self {
+            line: self.line,
+            col: self.col,
+            codepoint: self.codepoint.start..other.codepoint.end,
+            dist_from_prev: self.dist_from_prev,
+        }
     }
 }
 
@@ -33,7 +47,7 @@ impl<T> Spanned<T> {
 
     pub fn new_value(value: T) -> Self {
         Self {
-            span: Span::new(0, 0..0, 0..0, 0),
+            span: Span::new(0, 0, 0..0, 0),
             value,
         }
     }
@@ -53,9 +67,6 @@ where
 pub enum TokenKind {
     /** brackets */
     Brac(BracToken),
-
-    /** separators */
-    Sep(char),
 
     /** numeric/string/char literals */
     Lit(LitToken),

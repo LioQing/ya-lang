@@ -1,12 +1,29 @@
 use super::*;
 
+pub enum ReduceResult {
+    Expr(Expr),
+    Stmts(Stmts),
+    Stmt(Stmt),
+}
+
+impl Into<StackItem> for ReduceResult {
+    fn into(self) -> StackItem {
+        match self {
+            ReduceResult::Expr(expr) => StackItem::Expr(expr),
+            ReduceResult::Stmts(stmts) => StackItem::Stmts(stmts),
+            ReduceResult::Stmt(stmt) => StackItem::Stmt(stmt),
+        }
+    }
+}
+
 #[derive(derivative::Derivative, Clone)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct Rule {
     pub patt: Vec<Patt>,
+    pub prec: i32,
 
     #[derivative(Debug = "ignore", PartialEq = "ignore", Hash = "ignore")]
-    pub to_expr: fn(&[StackItem]) -> ExprKind,
+    pub reduce: fn(&[StackItem]) -> ReduceResult,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -14,17 +31,23 @@ pub enum Patt {
     /** any expression */
     Expr,
 
+    /** statements */
+    Stmts,
+
+    /** statement */
+    Stmt,
+
     /** brackets */
     Brac(char),
-
-    /** separators */
-    Sep(char),
 
     /** numeric/string/char literals */
     Lit(LitPatt),
 
     /** punctuation */
     Punc,
+
+    /** specific punctuation */
+    PuncStr(String),
 
     /** identifiers */
     Id,
@@ -41,6 +64,14 @@ impl Patt {
                 &StackItem::Expr(_),
             )
             | (
+                &Self::Stmts,
+                &StackItem::Stmts(_),
+            )
+            | (
+                &Self::Stmt,
+                &StackItem::Stmt(_),
+            )
+            | (
                 &Self::Punc,
                 &StackItem::Token(Token { value: TokenKind::Punc(_), .. }),
             )
@@ -49,12 +80,12 @@ impl Patt {
                 &StackItem::Token(Token { value: TokenKind::Id(_), .. }),
             ) => true,
             (
-                &Self::Brac(a),
-                &StackItem::Token(Token { value: TokenKind::Brac(BracToken { raw: b, .. }), .. }),
+                &Self::PuncStr(a),
+                &StackItem::Token(Token { value: TokenKind::Punc(b), .. }),
             ) if a == b => true,
             (
-                &Self::Sep(a),
-                &StackItem::Token(Token { value: TokenKind::Sep(b), .. }),
+                &Self::Brac(a),
+                &StackItem::Token(Token { value: TokenKind::Brac(BracToken { raw: b, .. }), .. }),
             ) if a == b => true,
             (
                 &Self::Lit(a),

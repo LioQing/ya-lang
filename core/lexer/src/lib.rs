@@ -445,7 +445,7 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
                     tok.value,
                     Span {
                         line: self.line,
-                        col: self.col - count..self.col,
+                        col: self.col - count,
                         codepoint: self.codepoint - count..self.codepoint,
                         dist_from_prev,
                     },
@@ -454,7 +454,7 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
                     err.value,
                     Span {
                         line: self.line,
-                        col: self.col - count..self.col,
+                        col: self.col - count,
                         codepoint: self.codepoint - count..self.codepoint,
                         dist_from_prev,
                     },

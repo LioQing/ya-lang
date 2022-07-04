@@ -8,52 +8,52 @@ fn bracs() {
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '(', depth: 0, kind: BracKind::Open }),
-        Span::new(0, 0..1, 0..1, 0),
+        Span::new(0, 0, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: ')', depth: 0, kind: BracKind::Close }),
-        Span::new(0, 1..2, 1..2, 0),
+        Span::new(0, 1, 1..2, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '[', depth: 0, kind: BracKind::Open }),
-        Span::new(0, 2..3, 2..3, 0),
+        Span::new(0, 2, 2..3, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '(', depth: 1, kind: BracKind::Open }),
-        Span::new(0, 3..4, 3..4, 0),
+        Span::new(0, 3, 3..4, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '{', depth: 2, kind: BracKind::Open }),
-        Span::new(0, 4..5, 4..5, 0),
+        Span::new(0, 4, 4..5, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '}', depth: 2, kind: BracKind::Close }),
-        Span::new(0, 5..6, 5..6, 0),
+        Span::new(0, 5, 5..6, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: ')', depth: 1, kind: BracKind::Close }),
-        Span::new(0, 6..7, 6..7, 0),
+        Span::new(0, 6, 6..7, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '{', depth: 1, kind: BracKind::Open }),
-        Span::new(0, 7..8, 7..8, 0),
+        Span::new(0, 7, 7..8, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '}', depth: 1, kind: BracKind::Close }),
-        Span::new(0, 8..9, 8..9, 0),
+        Span::new(0, 8, 8..9, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: ']', depth: 0, kind: BracKind::Close }),
-        Span::new(0, 9..10, 9..10, 0),
+        Span::new(0, 9, 9..10, 0),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -70,7 +70,7 @@ fn num_lit() {
             suffix: "".to_string(),
             kind: LitKind::Int,
         }),
-        Span::new(0, 0..4, 0..4, 0),
+        Span::new(0, 0, 0..4, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -80,7 +80,7 @@ fn num_lit() {
             suffix: "".to_string(),
             kind: LitKind::Float { dot_pos: Some(1), exp_pos: None },
         }),
-        Span::new(0, 5..9, 5..9, 1),
+        Span::new(0, 5, 5..9, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -90,7 +90,7 @@ fn num_lit() {
             suffix: "".to_string(),
             kind: LitKind::Float { dot_pos: None, exp_pos: Some(2) },
         }),
-        Span::new(0, 10..15, 10..15, 1),
+        Span::new(0, 10, 10..15, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -100,7 +100,7 @@ fn num_lit() {
             suffix: "".to_string(),
             kind: LitKind::Int,
         }),
-        Span::new(0, 16..21, 16..21, 1),
+        Span::new(0, 16, 16..21, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -110,7 +110,7 @@ fn num_lit() {
             suffix: "".to_string(),
             kind: LitKind::Int,
         }),
-        Span::new(0, 22..27, 22..27, 1),
+        Span::new(0, 22, 22..27, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -120,7 +120,7 @@ fn num_lit() {
             suffix: "f32".to_string(),
             kind: LitKind::Int,
         }),
-        Span::new(0, 28..34, 28..34, 1),
+        Span::new(0, 28, 28..34, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -130,7 +130,7 @@ fn num_lit() {
             suffix: "i32".to_string(),
             kind: LitKind::Int,
         }),
-        Span::new(0, 35..43, 35..43, 1),
+        Span::new(0, 35, 35..43, 1),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -147,7 +147,7 @@ fn quote_lit() {
             suffix: "def".to_string(),
             kind: LitKind::Quote { quote: '"' },
         }),
-        Span::new(0, 0..11, 0..11, 0),
+        Span::new(0, 0, 0..11, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -157,7 +157,7 @@ fn quote_lit() {
             suffix: "def".to_string(),
             kind: LitKind::Quote { quote: '\'' },
         }),
-        Span::new(0, 12..23, 12..23, 1),
+        Span::new(0, 12, 12..23, 1),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -174,7 +174,7 @@ fn bool_lit() {
             suffix: "".to_string(),
             kind: LitKind::Bool,
         }),
-        Span::new(0, 0..4, 0..4, 0),
+        Span::new(0, 0, 0..4, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
@@ -184,7 +184,7 @@ fn bool_lit() {
             suffix: "".to_string(),
             kind: LitKind::Bool,
         }),
-        Span::new(0, 5..10, 5..10, 1),
+        Span::new(0, 5, 5..10, 1),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -196,12 +196,12 @@ fn id() {
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Id("abc_123".to_string()),
-        Span::new(0, 0..7, 0..7, 0),
+        Span::new(0, 0, 0..7, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Id("_abc".to_string()),
-        Span::new(0, 8..12, 8..12, 1),
+        Span::new(0, 8, 8..12, 1),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -213,12 +213,12 @@ fn kw() {
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Kw("let".to_string()),
-        Span::new(0, 0..3, 0..3, 0),
+        Span::new(0, 0, 0..3, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Kw("const".to_string()),
-        Span::new(0, 4..9, 4..9, 1),
+        Span::new(0, 4, 4..9, 1),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -230,27 +230,27 @@ fn punc() {
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Punc("-".to_owned()),
-        Span::new(0, 0..1, 0..1, 0),
+        Span::new(0, 0, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Punc("+".to_owned()),
-        Span::new(0, 2..3, 2..3, 1),
+        Span::new(0, 2, 2..3, 1),
     ))));
     
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Punc("+=".to_owned()),
-        Span::new(0, 4..6, 4..6, 1),
+        Span::new(0, 4, 4..6, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Punc("!&!".to_owned()),
-        Span::new(0, 7..10, 7..10, 1),
+        Span::new(0, 7, 7..10, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Punc(".*!&@".to_owned()),
-        Span::new(0, 11..16, 11..16, 1),
+        Span::new(0, 11, 11..16, 1),
     ))));
 }
 
@@ -262,12 +262,12 @@ fn mismatched_bracs() {
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '{', depth: 0, kind: BracKind::Open }),
-        Span::new(0, 0..1, 0..1, 0),
+        Span::new(0, 0, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
         ErrorKind::MismatchedBracs('}', ')'),
-        Span::new(0, 1..2, 1..2, 0),
+        Span::new(0, 1, 1..2, 0),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -279,7 +279,7 @@ fn missing_open_brac() {
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
         ErrorKind::MissingOpenBrac('}'),
-        Span::new(0, 0..1, 0..1, 0),
+        Span::new(0, 0, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -291,12 +291,12 @@ fn missing_close_brac() {
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
         TokenKind::Brac(BracToken { raw: '{', depth: 0, kind: BracKind::Open }),
-        Span::new(0, 0..1, 0..1, 0),
+        Span::new(0, 0, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
         ErrorKind::MissingCloseBrac('{'),
-        Span::new(0, 0..1, 0..1, 0),
+        Span::new(0, 0, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -308,7 +308,7 @@ fn missing_digit_after_prefix() {
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
         ErrorKind::MissingDigitAfterPrefix("0x".to_owned()),
-        Span::new(0, 0..2, 0..2, 0),
+        Span::new(0, 0, 0..2, 0),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -320,7 +320,7 @@ fn missing_close_quote() {
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
         ErrorKind::MissingCloseQuote("\"abc".to_owned()),
-        Span::new(0, 0..4, 0..4, 0),
+        Span::new(0, 0, 0..4, 0),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -333,7 +333,7 @@ fn invalid_esc_seq() {
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
         ErrorKind::InvalidEscSeq(vec!["\\z".to_owned()]),
-        Span::new(0, 0..4, 0..4, 0),
+        Span::new(0, 0, 0..4, 0),
     ))));
 
     assert_eq!(lexer.next(), None);
@@ -343,7 +343,7 @@ fn invalid_esc_seq() {
 
     assert_eq!(lexer.next(), Some(Err(Error::new(
         ErrorKind::InvalidEscSeq(vec!["\\z".to_owned(), "\\a".to_owned(), "\\1".to_owned()]),
-        Span::new(0, 0..8, 0..8, 0),
+        Span::new(0, 0, 0..8, 0),
     ))));
 
     assert_eq!(lexer.next(), None);
