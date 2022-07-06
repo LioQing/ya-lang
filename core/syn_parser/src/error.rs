@@ -6,7 +6,7 @@ pub enum ErrorKind {
     #[error("Lexer error: {0}")]
     Lexer(#[from] lexer::ErrorKind),
 
-    #[error("Unknown syntax")]
+    #[error("Unknown Syntax")]
     UnknownSyntax,
 }
 

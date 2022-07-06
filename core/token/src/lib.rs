@@ -81,6 +81,43 @@ pub enum TokenKind {
     Kw(String),
 }
 
+impl TokenKind {
+    pub fn brac(self) -> BracToken {
+        match self {
+            TokenKind::Brac(b) => b,
+            _ => panic!("not a bracket token"),
+        }
+    }
+
+    pub fn lit(self) -> LitToken {
+        match self {
+            TokenKind::Lit(l) => l,
+            _ => panic!("not a literal token"),
+        }
+    }
+
+    pub fn punc(self) -> String {
+        match self {
+            TokenKind::Punc(p) => p,
+            _ => panic!("not a punctuation token"),
+        }
+    }
+
+    pub fn id(self) -> String {
+        match self {
+            TokenKind::Id(i) => i,
+            _ => panic!("not an identifier token"),
+        }
+    }
+
+    pub fn kw(self) -> String {
+        match self {
+            TokenKind::Kw(k) => k,
+            _ => panic!("not a keyword token"),
+        }
+    }
+}
+
 // Bracket token.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BracToken {

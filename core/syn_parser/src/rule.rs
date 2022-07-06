@@ -1,21 +1,5 @@
 use super::*;
 
-pub enum ReduceResult {
-    Expr(Expr),
-    Stmts(Stmts),
-    Stmt(Stmt),
-}
-
-impl Into<StackItem> for ReduceResult {
-    fn into(self) -> StackItem {
-        match self {
-            ReduceResult::Expr(expr) => StackItem::Expr(expr),
-            ReduceResult::Stmts(stmts) => StackItem::Stmts(stmts),
-            ReduceResult::Stmt(stmt) => StackItem::Stmt(stmt),
-        }
-    }
-}
-
 #[derive(derivative::Derivative, Clone)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct Rule {
@@ -23,7 +7,7 @@ pub struct Rule {
     pub prec: i32,
 
     #[derivative(Debug = "ignore", PartialEq = "ignore", Hash = "ignore")]
-    pub reduce: fn(&[StackItem]) -> ReduceResult,
+    pub reduce: fn(&[StackItem]) -> StackItem,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -47,13 +31,13 @@ pub enum Patt {
     Punc,
 
     /** specific punctuation */
-    PuncStr(String),
+    PuncStr(&'static str),
 
     /** identifiers */
     Id,
 
     /** keywords */
-    Kw(String),
+    Kw(&'static str),
 }
 
 impl Patt {
@@ -82,7 +66,7 @@ impl Patt {
             (
                 &Self::PuncStr(a),
                 &StackItem::Token(Token { value: TokenKind::Punc(b), .. }),
-            ) if a == b => true,
+            ) if a == &b => true,
             (
                 &Self::Brac(a),
                 &StackItem::Token(Token { value: TokenKind::Brac(BracToken { raw: b, .. }), .. }),
@@ -94,7 +78,8 @@ impl Patt {
             (
                 &Self::Kw(a),
                 &StackItem::Token(Token { value: TokenKind::Kw(b), .. }),
-            ) if a == b => true,
+            ) if a == &b => true,
+            (_, &StackItem::Err(_)) => true,
             _ => false,
         }
     }

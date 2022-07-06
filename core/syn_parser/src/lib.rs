@@ -16,63 +16,10 @@ pub use rule::*;
 mod error;
 pub use error::*;
 
+mod stack_item;
+pub use stack_item::*;
+
 pub type SynResult<T> = Result<T, Error>;
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum StackItem {
-    Token(Token),
-    Expr(Expr),
-    Stmts(Stmts),
-    Stmt(Stmt),
-    Err(Error),
-}
-
-impl StackItem {
-    pub fn span(&self) -> &Span {
-        match &self {
-            &Self::Token(Token { span, .. })
-            | &Self::Expr(Expr { span, .. })
-            | &Self::Stmts(Stmts { span, .. })
-            | &Self::Stmt(Stmt { span, .. })
-            | &Self::Err(Error { span, .. }) => {
-                span
-            }
-        }
-    }
-
-    pub fn token_or_err(self) -> Result<Token, Error> {
-        match self {
-            Self::Token(token) => Ok(token),
-            Self::Err(err) => Err(err),
-            _ => panic!("not a token or error"),
-        }
-    }
-
-    pub fn expr_or_err(self) -> Result<Expr, Error> {
-        match self {
-            Self::Expr(expr) => Ok(expr),
-            Self::Err(err) => Err(err),
-            _ => panic!("not an expr or error"),
-        }
-    }
-
-    pub fn stmts_or_err(self) -> Result<Stmts, Error> {
-        match self {
-            Self::Stmts(stmts) => Ok(stmts),
-            Self::Err(err) => Err(err),
-            _ => panic!("not a stmts or error"),
-        }
-    }
-
-    pub fn stmt_or_err(self) -> Result<Stmt, Error> {
-        match self {
-            Self::Stmt(stmt) => Ok(stmt),
-            Self::Err(err) => Err(err),
-            _ => panic!("not a stmt or error"),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Parser<'a> {
     pub lexer: std::iter::Peekable<lexer::Lexer<'a>>,
@@ -176,7 +123,7 @@ impl<'a> Parser<'a> {
                         let rule = reducibles.into_iter().next().unwrap();
                         let skip = self.stack.len() - rule.patt.len();
 
-                        let item = (rule.reduce)(&self.stack[skip..]).into();
+                        let item = (rule.reduce)(&self.stack[skip..]);
 
                         self.stack.splice(skip.., std::iter::once(item));
                         reduced = true;
@@ -186,7 +133,18 @@ impl<'a> Parser<'a> {
             };
 
             if shiftables.is_empty() && next.is_none() && !reduced {
-                panic!("no pattern found");
+                let skip = self.stack.len() - self.stack
+                    .iter()
+                    .rev()
+                    .take_while(|&item| !matches!(item, &StackItem::Expr(_)))
+                    .count();
+                    
+                let span = self.stack[skip].span().merge(self.stack.last().unwrap().span());
+
+                self.stack.splice(skip.., std::iter::once(StackItem::Err(Error::new(
+                    ErrorKind::UnknownSyntax,
+                    span,
+                ))));
             } else if shiftables.is_empty() && next.is_none() {
                 break;
             } else {
