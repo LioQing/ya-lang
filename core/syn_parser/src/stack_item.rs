@@ -19,15 +19,17 @@ macro_rules! stack_items {
                 }
             }
 
-            paste! {$(
-                pub fn [<$name:lower _or_err>](self) -> Result<$name, Error> {
-                    match self {
-                        Self::$name(x) => Ok(x),
-                        Self::Err(err) => Err(err),
-                        _ => panic!("not a {} or error", stringify!([<$name:lower>])),
+            paste! {
+                $(
+                    pub fn [<$name:lower _or_err>](self) -> Result<$name, Error> {
+                        match self {
+                            Self::$name(x) => Ok(x),
+                            Self::Err(err) => Err(err),
+                            _ => panic!("not a {} or error", stringify!([<$name:lower>])),
+                        }
                     }
-                }
-            )*}
+                )*
+            }
         }
 
         $(

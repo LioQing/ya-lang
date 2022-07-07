@@ -1,5 +1,18 @@
 use super::*;
 
+#[macro_export]
+macro_rules! rules {
+    ($($prec:literal % $($patts:expr),+ $(,)? => $reduce:expr),+ $(,)?) => {
+        [$(
+            Rule {
+                patt: vec![$($patts,)+],
+                prec: $prec,
+                reduce: $reduce,
+            },
+        )+].into()
+    };
+}
+
 #[derive(derivative::Derivative, Clone)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
 pub struct Rule {

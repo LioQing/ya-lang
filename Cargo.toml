@@ -11,3 +11,6 @@ members = [
     "./core/lexer",
     "./core/syn_parser",
 ]
+
+[dependencies]
+syn_parser = { path = "./core/syn_parser" }
