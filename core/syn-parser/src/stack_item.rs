@@ -2,17 +2,17 @@ use super::*;
 use paste::paste;
 
 macro_rules! stack_items {
-    ($($name:ident,)*) => {
+    ($($name:ident => $typename:ty,)*) => {
         #[derive(Debug, PartialEq, Eq, Clone, Hash)]
         pub enum StackItem {
-            $($name($name),)*
+            $($name($typename),)*
             Err(Error),
         }
         
         impl StackItem {
-            pub fn span(&self) -> &Span {
+            pub fn span(&self) -> &token::Span {
                 match &self {
-                    $(Self::$name($name { span, .. }))|*
+                    $(Self::$name(token::Spanned { span, .. }))|*
                     | &Self::Err(Error { span, .. }) => {
                         span
                     }
@@ -21,11 +21,11 @@ macro_rules! stack_items {
 
             paste! {
                 $(
-                    pub fn [<$name:lower _or_err>](self) -> Result<$name, Error> {
+                    pub fn [<$name:snake _or_err>](self) -> Result<$typename, Error> {
                         match self {
                             Self::$name(x) => Ok(x),
                             Self::Err(err) => Err(err),
-                            _ => panic!("not a {} or error", stringify!([<$name:lower>])),
+                            _ => panic!("not a {} or error", stringify!([<$name:snake>])),
                         }
                     }
                 )*
@@ -33,8 +33,8 @@ macro_rules! stack_items {
         }
 
         $(
-            impl From<Result<$name, Error>> for StackItem {
-                fn from(x: Result<$name, Error>) -> Self {
+            impl From<Result<$typename, Error>> for StackItem {
+                fn from(x: Result<$typename, Error>) -> Self {
                     match x {
                         Ok(x) => Self::$name(x),
                         Err(err) => Self::Err(err),
@@ -44,14 +44,15 @@ macro_rules! stack_items {
         )*
     };
 
-    ($($name:ident),*) => {
-        stack_item_gen! { $($name,)* }
+    ($($name:ident => $typename:ty),*) => {
+        stack_items! { $($name,)* }
     };
 }
 
 stack_items! {
-    Expr,
-    Stmts,
-    Stmt,
-    Token,
+    Expr => Expr,
+    Stmts => Repeats<ExprKind>,
+    Stmt => Repeat<ExprKind>,
+    LetDecl => LetDecl,
+    Token => Token,
 }

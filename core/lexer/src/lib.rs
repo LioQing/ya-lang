@@ -328,7 +328,7 @@ impl<'a> Lexer<'a> {
         }
 
         const KEYWORDS: &'static [&'static str] = &[
-            "let", "const",
+            "let", "const", "mut",
         ];
 
         const BOOL_KW: &'static [&'static str] = &[

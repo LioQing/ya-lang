@@ -57,7 +57,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "syn_parser"
+name = "syn-parser"
 version = "0.1.0"
 dependencies = [
  "derivative",
@@ -100,6 +100,3 @@ checksum = "5bd2fe26506023ed7b5e1e315add59d6f584c621d037f9368fea9cfb988f368c"
 [[package]]
 name = "ya-lang"
 version = "0.1.0"
-dependencies = [
- "syn_parser",
-]

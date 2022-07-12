@@ -118,6 +118,20 @@ impl TokenKind {
     }
 }
 
+impl std::fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let display = match self {
+            Self::Brac(BracToken { raw, .. }) => raw.to_string(),
+            Self::Punc(raw) | Self::Id(raw) | Self::Kw(raw) => raw.clone(),
+            Self::Lit(LitToken { raw, prefix, suffix, .. }) => {
+                raw.clone() + prefix.as_str() + suffix.as_str()
+            },
+        };
+
+        write!(f, "{}", display)
+    }
+}
+
 // Bracket token.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BracToken {

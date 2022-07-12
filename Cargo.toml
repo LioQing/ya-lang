@@ -9,8 +9,7 @@ edition = "2021"
 members = [
     "./core/token",
     "./core/lexer",
-    "./core/syn_parser",
+    "./core/syn-parser",
 ]
 
 [dependencies]
-syn_parser = { path = "./core/syn_parser" }

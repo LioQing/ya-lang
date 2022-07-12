@@ -7,8 +7,11 @@ mod tests;
 mod expr;
 pub use expr::*;
 
-mod stmts;
-pub use stmts::*;
+mod repeats;
+pub use repeats::*;
+
+mod let_decl;
+pub use let_decl::*;
 
 mod rule;
 pub use rule::*;
@@ -19,11 +22,18 @@ pub use error::*;
 mod stack_item;
 pub use stack_item::*;
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum Assoc {
+    Left,
+    Right,
+}
+
 pub type SynResult<T> = Result<T, Error>;
 #[derive(Debug)]
 pub struct Parser<'a> {
     pub lexer: std::iter::Peekable<lexer::Lexer<'a>>,
     pub rules: HashSet<Rule>,
+    pub assoc: fn(i32) -> Assoc,
 
     stack: Vec<StackItem>,
 }
@@ -33,6 +43,7 @@ impl<'a> Parser<'a> {
         Parser {
             lexer: lexer::Lexer::new(code).peekable(),
             rules: [].into(),
+            assoc: |_| Assoc::Left,
             stack: vec![],
         }
     }
@@ -52,6 +63,33 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn shiftables<'b>(stack: Vec<&StackItem>, rules: &'b HashSet<Rule>) -> HashSet<&'b Rule> {
+        let shiftables = rules
+            .iter()
+            .filter(|&rule| (0..stack.len())
+                .rev()
+                .take(rule.patt.len())
+                .rev()
+                .any(|i| stack[i..]
+                    .iter()
+                    .zip(rule.patt.iter())
+                    .all(|(&a, b)| b.match_item(a))
+                )
+            );
+        
+        shiftables
+            .clone()
+            .filter(|rule| match shiftables
+                .clone()
+                .map(|rule| rule.prec)
+                .max()
+            {
+                Some(prec) => prec == rule.prec,
+                None => false,
+            })
+            .collect::<HashSet<_>>()
+    }
+
     pub fn parse(&mut self) {
         loop {
             // get next item
@@ -60,33 +98,24 @@ impl<'a> Parser<'a> {
                 None => None,
             };
 
-            // shiftables
-            let shiftables = if let Some(next) = &next {
-                let next_stack = self.stack
-                    .iter()
-                    .chain(std::iter::once(next))
-                    .collect::<Vec<_>>();
-
-                self.rules
-                    .iter()
-                    .filter(|&rule| (0..next_stack.len())
-                        .rev()
-                        .take(rule.patt.len())
-                        .rev()
-                        .any(|i| next_stack[i..]
-                            .iter()
-                            .zip(rule.patt.iter())
-                            .all(|(&a, b)| b.match_item(a))
-                        )
-                    )
-                    .collect::<HashSet<_>>()
-            } else {
-                [].into()
-            };
-            
-            // reduce
             let mut reduced = false;
+            let mut shiftables;
             loop {
+                // shifts
+                shiftables = if let Some(next) = &next {
+                    let next_stack = self.stack
+                        .iter()
+                        .chain(std::iter::once(next))
+                        .collect::<Vec<_>>();
+    
+                    Self::shiftables(next_stack, &self.rules)
+                } else {
+                    [].into()
+                };
+
+                let shift_prec = shiftables.iter().next().map(|rule| rule.prec);
+
+                // reduces
                 let curr_stack = &self.stack;
                 let reducibles = self.rules
                     .iter()
@@ -100,19 +129,21 @@ impl<'a> Parser<'a> {
                         .all(|(a, b)| b.match_item(a))
                     );
 
-                let max_prec = reducibles
+                let reduce_prec = reducibles
                     .clone()
                     .map(|rule| rule.prec)
-                    .max()
-                    .unwrap_or(0);
+                    .max();
                 
                 let reducibles = reducibles
-                    .filter(|&rule| rule.prec == max_prec)
+                    .filter(|&rule| match reduce_prec {
+                        Some(prec) => prec == rule.prec,
+                        None => false,
+                    })
                     .collect::<HashSet<_>>();
 
-                // debug
-                println!("{:?} {}", shiftables, shiftables.len());
-                println!("RE: {:?}\n", reducibles);
+                println!("{:?}", next);
+                println!("{:?}", shiftables);
+                println!("{:?}\n", reducibles);
 
                 match reducibles.len() {
                     0 => {
@@ -123,14 +154,36 @@ impl<'a> Parser<'a> {
                         let rule = reducibles.into_iter().next().unwrap();
                         let skip = self.stack.len() - rule.patt.len();
 
+                        if shift_prec
+                            .map(|prec|
+                                prec > reduce_prec.unwrap()
+                                || prec == reduce_prec.unwrap() && (self.assoc)(prec) == Assoc::Right
+                            )
+                            .unwrap_or(false)
+                        {
+                            break;
+                        }
+
                         let item = (rule.reduce)(&self.stack[skip..]);
 
                         self.stack.splice(skip.., std::iter::once(item));
                         reduced = true;
                     },
-                    _ => panic!("reduce-reduce conflict: {reducibles:#?}"),
+                    _ => {
+                        if shift_prec
+                            .map(|prec|
+                                prec > reduce_prec.unwrap()
+                                || prec == reduce_prec.unwrap() && (self.assoc)(prec) == Assoc::Right
+                            )
+                            .unwrap_or(false)
+                        {
+                            break;
+                        } else {
+                            panic!("reduce-reduce conflict: {reducibles:#?}")
+                        }
+                    },
                 }
-            };
+            }
 
             if shiftables.is_empty() && next.is_none() && !reduced {
                 let skip = self.stack.len() - self.stack
@@ -138,6 +191,10 @@ impl<'a> Parser<'a> {
                     .rev()
                     .take_while(|&item| !matches!(item, &StackItem::Expr(_)))
                     .count();
+
+                if skip == self.stack.len() {
+                    break;
+                }
                     
                 let span = self.stack[skip].span().merge(self.stack.last().unwrap().span());
 
@@ -159,6 +216,7 @@ impl<'a> From<lexer::Lexer<'a>> for Parser<'a> {
         Parser {
             lexer: lexer.peekable(),
             rules: [].into(),
+            assoc: |_| Assoc::Left,
             stack: vec![],
         }
     }

@@ -24,6 +24,57 @@ pub enum ExprKind {
     Bin(BinExpr),
 }
 
+impl ExprKind {
+    pub fn lit(self) -> LitToken {
+        match self {
+            ExprKind::Lit(lit) => lit,
+            _ => panic!("not a lit"),
+        }
+    }
+
+    pub fn id(self) -> String {
+        match self {
+            ExprKind::Id(id) => id,
+            _ => panic!("not an id"),
+        }
+    }
+
+    pub fn paren(self) -> ParenExpr {
+        match self {
+            ExprKind::Paren(paren) => paren,
+            _ => panic!("not a paren"),
+        }
+    }
+
+    pub fn block(self) -> BlockExpr {
+        match self {
+            ExprKind::Block(block) => block,
+            _ => panic!("not a block"),
+        }
+    }
+
+    pub fn let_(self) -> LetExpr {
+        match self {
+            ExprKind::Let(let_) => let_,
+            _ => panic!("not a let"),
+        }
+    }
+
+    pub fn const_(self) -> ConstExpr {
+        match self {
+            ExprKind::Const(const_) => const_,
+            _ => panic!("not a const"),
+        }
+    }
+
+    pub fn bin(self) -> BinExpr {
+        match self {
+            ExprKind::Bin(bin) => bin,
+            _ => panic!("not a bin"),
+        }
+    }
+}
+
 pub type Expr = Spanned<ExprKind>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -39,10 +90,10 @@ pub struct BlockExpr {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct LetExpr {
-    pub mutable: bool,
+    pub mutable: Option<Spanned<()>>,
     pub id: SynResult<Spanned<String>>,
-    pub ty: SynResult<Option<Spanned<String>>>,
-    pub expr: Option<Box<Result<Expr, Error>>>,
+    pub ty: Option<SynResult<Spanned<String>>>,
+    pub expr: Option<Box<SynResult<Expr>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
