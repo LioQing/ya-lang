@@ -24,7 +24,7 @@ pub struct Rule {
 }
 
 macro_rules! patt {
-    ($($custom_stack_item:ident),* $(,)?) => {
+    ($($custom_stack_item:ident),* $(,)? $(; op_punc = $ops:literal $(,)?)?) => {
         #[derive(Debug, PartialEq, Eq, Clone, Hash)]
         pub enum Patt {
             $($custom_stack_item,)*
@@ -37,6 +37,9 @@ macro_rules! patt {
 
             /** punctuation */
             Punc,
+
+            /** operator punctuations */
+            OpPunc,
 
             /** specific punctuation */
             PuncStr(&'static str),
@@ -63,6 +66,10 @@ macro_rules! patt {
                         &Self::Id,
                         &StackItem::Expr(Expr { value: ExprKind::Id(_), .. }),
                     ) => true,
+                    $((
+                        &Self::OpPunc,
+                        &StackItem::Token(Token { value: TokenKind::Punc(b), .. }),
+                    ) if b.chars().all(|c| $ops.contains(c)) => true,)?
                     (
                         &Self::PuncStr(a),
                         &StackItem::Token(Token { value: TokenKind::Punc(b), .. }),
@@ -114,6 +121,9 @@ macro_rules! patt {
 patt! {
     Expr,
     Stmts,
-    Stmt,
     LetDecl,
+    TyIds,
+    Ty,
+    ;
+    op_punc = "!@#$%^&*=`?~|/+-<>",
 }

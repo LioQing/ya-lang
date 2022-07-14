@@ -4,12 +4,14 @@ use super::*;
 fn print() {
     let mut syn = Parser::new("
     {
-        let a = 10
+        let mut a: i32 = 10;
+        let mut b: i32 = 12;
+        a
     }
     ");
 
     syn.assoc = |prec| {
-        if prec == 1 || prec == 2 {
+        if prec == 2 {
             Assoc::Right
         } else {
             Assoc::Left
@@ -17,6 +19,25 @@ fn print() {
     };
 
     syn.rules = rules! {
+        // ty
+
+        // 0 % Patt::TyIds, Patt::PuncStr("::"), Patt::Id
+        // => |items| {
+        //     let mut ty_ids = items[0]
+        //         .clone()
+        //         .ty_ids_or_err()
+        //         .unwrap();
+            
+        //     ty_ids.value.push(
+        //         items[2]
+        //             .clone()
+        //             .expr_or_err()
+        //             .map(|expr| Spanned::new(expr.value.id(), expr.span))
+        //     );
+
+        //     StackItem::TyIds(Repeats::new(ty_ids.value, items[0].span().clone()))
+        // },
+
         // paren
 
         0 % Patt::Brac('('), Patt::Expr, Patt::Brac(')')
@@ -30,36 +51,34 @@ fn print() {
         // stmt & stmts
 
         0 % Patt::Expr, Patt::PuncStr(";")
-        => |items| items[0]
-            .clone()
-            .expr_or_err()
-            .map(|expr| Repeat::new(
-                expr.value.into(),
-                expr.span.merge(items[1].span()),
-            ))
-            .into(),
-
-        1 % Patt::Stmt
         => |items| StackItem::Stmts(Repeats::new(
             RepeatsKind {
                 value: items[0]
                     .clone()
-                    .stmt_or_err()
-                    .map(|stmt| stmt.value.value)
+                    .expr_or_err()
+                    .map(|expr| expr.value)
                     .map_err(|err| err.value),
                 next: None,
             },
-            items[0].span().clone(),
+            items[0].span().merge(items[1].span()),
         )),
         
-        1 % Patt::Stmts, Patt::Stmt
+        0 % Patt::Stmts, Patt::Stmts
         => |items| {
             let mut stmts = items[0]
                 .clone()
                 .stmts_or_err()
                 .unwrap();
             
-            stmts.value.push(items[1].clone().stmt_or_err());
+            stmts.value.push(match items[1]
+                .clone()
+                .stmts_or_err()
+            {
+                Ok(stmts) => stmts.value.value
+                    .map(|expr| Spanned::new(expr, stmts.span.clone()))
+                    .map_err(|err| Spanned::new(err, stmts.span)),
+                Err(err) => Err(err),
+            });
 
             StackItem::Stmts(Repeats::new(stmts.value, items[0].span().clone()))
         },
@@ -112,7 +131,7 @@ fn print() {
 
         // let decl
 
-        1 % Patt::Kw("let"), Patt::Kw("mut"), Patt::Id
+        2 % Patt::Kw("let"), Patt::Kw("mut"), Patt::Id
         => |items| StackItem::LetDecl(LetDecl::new(
             LetDeclKind {
                 mutable: Some(Spanned::new((), items[1].span().clone())),
@@ -125,7 +144,7 @@ fn print() {
             items[0].span().merge(items[2].span()),
         )),
 
-        1 % Patt::Kw("let"), Patt::Id, Patt::PuncStr(":"), Patt::Id
+        2 % Patt::Kw("let"), Patt::Id, Patt::PuncStr(":"), Patt::Id
         => |items| StackItem::LetDecl(LetDecl::new(
             LetDeclKind {
                 mutable: None,
@@ -142,7 +161,7 @@ fn print() {
             items[0].span().merge(items[2].span()),
         )),
 
-        1 % Patt::Kw("let"), Patt::Kw("mut"), Patt::Id, Patt::PuncStr(":"), Patt::Id
+        2 % Patt::Kw("let"), Patt::Kw("mut"), Patt::Id, Patt::PuncStr(":"), Patt::Id
         => |items| StackItem::LetDecl(LetDecl::new(
             LetDeclKind {
                 mutable: Some(Spanned::new((), items[0].span().clone())),
@@ -159,7 +178,7 @@ fn print() {
             items[0].span().merge(items[2].span()),
         )),
         
-        1 % Patt::Kw("let"), Patt::Id
+        2 % Patt::Kw("let"), Patt::Id
         => |items| StackItem::LetDecl(LetDecl::new(
             LetDeclKind {
                 mutable: None,
@@ -172,9 +191,9 @@ fn print() {
             items[0].span().merge(items[1].span()),
         )),
 
-        // let
+        // let expr
         
-        1 % Patt::LetDecl, Patt::PuncStr("="), Patt::Expr
+        2 % Patt::LetDecl, Patt::PuncStr("="), Patt::Expr
         => |items| items[0]
             .clone()
             .let_decl_or_err()
@@ -189,7 +208,7 @@ fn print() {
             ))
             .into(),
         
-        1 % Patt::LetDecl
+        2 % Patt::LetDecl
         => |items| items[0]
             .clone()
             .let_decl_or_err()
@@ -204,9 +223,27 @@ fn print() {
             ))
             .into(),
 
+        // const expr
+
+        2 % Patt::Kw("const"), Patt::Id, Patt::PuncStr(":"), Patt::Id, Patt::PuncStr("="), Patt::Expr
+        => |items| StackItem::Expr(Expr::new(
+            ExprKind::Const(ConstExpr {
+                id: items[1]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                ty: items[3]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                expr: Box::new(items[5].clone().expr_or_err()),
+            }),
+            items[0].span().merge(items[5].span()),
+        )),
+
         // bin op
 
-        0 % Patt::Expr, Patt::Punc, Patt::Expr
+        0 % Patt::Expr, Patt::OpPunc, Patt::Expr
         => |items| StackItem::Expr(Expr::new(
             ExprKind::Bin(BinExpr {
                 lhs: Box::new(items[0].clone().expr_or_err()),

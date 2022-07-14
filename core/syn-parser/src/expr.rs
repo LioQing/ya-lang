@@ -79,13 +79,13 @@ pub type Expr = Spanned<ExprKind>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ParenExpr {
-    pub expr: Box<Result<Expr, Error>>,
+    pub expr: Box<SynResult<Expr>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BlockExpr {
-    pub stmts: Vec<Result<Expr, Error>>,
-    pub expr: Option<Box<Result<Expr, Error>>>,
+    pub stmts: Vec<SynResult<Expr>>,
+    pub expr: Option<Box<SynResult<Expr>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -100,12 +100,12 @@ pub struct LetExpr {
 pub struct ConstExpr {
     pub id: SynResult<Spanned<String>>,
     pub ty: SynResult<Spanned<String>>,
-    pub expr: Box<Result<Expr, Error>>,
+    pub expr: Box<SynResult<Expr>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct BinExpr {
-    pub lhs: Box<Result<Expr, Error>>,
+    pub lhs: Box<SynResult<Expr>>,
     pub op: SynResult<Spanned<String>>,
-    pub rhs: Box<Result<Expr, Error>>,
+    pub rhs: Box<SynResult<Expr>>,
 }

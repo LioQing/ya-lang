@@ -13,6 +13,9 @@ pub use repeats::*;
 mod let_decl;
 pub use let_decl::*;
 
+mod ty;
+pub use ty::*;
+
 mod rule;
 pub use rule::*;
 
@@ -70,6 +73,7 @@ impl<'a> Parser<'a> {
                 .rev()
                 .take(rule.patt.len())
                 .rev()
+                .take_while(|&i| i < stack.len() - 1)
                 .any(|i| stack[i..]
                     .iter()
                     .zip(rule.patt.iter())
@@ -142,8 +146,9 @@ impl<'a> Parser<'a> {
                     .collect::<HashSet<_>>();
 
                 println!("{:?}", next);
+                // println!("{:#?}", self.stack);
                 println!("{:?}", shiftables);
-                println!("{:?}\n", reducibles);
+                println!("{:?}", reducibles);
 
                 match reducibles.len() {
                     0 => {
@@ -168,6 +173,7 @@ impl<'a> Parser<'a> {
 
                         self.stack.splice(skip.., std::iter::once(item));
                         reduced = true;
+                        println!("reduced\n");
                     },
                     _ => {
                         if shift_prec
@@ -206,6 +212,7 @@ impl<'a> Parser<'a> {
                 break;
             } else {
                 self.stack.push(next.unwrap());
+                println!("shifted\n");
             }
         }
     }

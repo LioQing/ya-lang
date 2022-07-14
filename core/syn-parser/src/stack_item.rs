@@ -52,7 +52,8 @@ macro_rules! stack_items {
 stack_items! {
     Expr => Expr,
     Stmts => Repeats<ExprKind>,
-    Stmt => Repeat<ExprKind>,
     LetDecl => LetDecl,
+    TyIds => Repeats<String>,
+    Ty => Ty,
     Token => Token,
 }
