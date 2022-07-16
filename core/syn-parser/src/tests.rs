@@ -4,14 +4,13 @@ use super::*;
 fn print() {
     let mut syn = Parser::new("
     {
-        let mut a: i32 = 10;
-        let mut b: i32 = 12;
+        let mut a: my_scope::MyType = 10;
         a
     }
     ");
 
     syn.assoc = |prec| {
-        if prec == 2 {
+        if [1, 2].contains(&prec) {
             Assoc::Right
         } else {
             Assoc::Left
@@ -21,50 +20,57 @@ fn print() {
     syn.rules = rules! {
         // ty
 
-        // 0 % Patt::TyIds, Patt::PuncStr("::"), Patt::Id
-        // => |items| {
-        //     let mut ty_ids = items[0]
-        //         .clone()
-        //         .ty_ids_or_err()
-        //         .unwrap();
-            
-        //     ty_ids.value.push(
-        //         items[2]
-        //             .clone()
-        //             .expr_or_err()
-        //             .map(|expr| Spanned::new(expr.value.id(), expr.span))
-        //     );
+        2 % Patt::Id, Patt::PuncStr("::"), Patt::Id
+        => |items, _| {
+            items[2]
+                .clone()
+                .expr_or_err()
+                .map(|expr| expr
+                    .map_value(|expr| {
+                        let IdExpr { id, scope } = expr.id();
 
-        //     StackItem::TyIds(Repeats::new(ty_ids.value, items[0].span().clone()))
-        // },
+                        ExprKind::Id(IdExpr {
+                            id: id,
+                            scope: std::iter::once(items[0]
+                                    .clone()
+                                    .expr_or_err()
+                                    .spanless()
+                                    .map(|expr| expr.id().id)
+                                    .unwrap()
+                                )
+                                .chain(scope.into_iter())
+                                .collect()
+                        })
+                    })
+                    .map_span(|span| span.merge(items[0].span()))
+                )
+                .into()
+        },
 
         // paren
 
         0 % Patt::Brac('('), Patt::Expr, Patt::Brac(')')
-        => |items| StackItem::Expr(Expr::new(
+        => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Paren(ParenExpr {
                 expr: Box::new(items[1].clone().expr_or_err()),
             }),
             items[0].span().merge(items[2].span()),
         )),
 
-        // stmt & stmts
+        // stmts
 
         0 % Patt::Expr, Patt::PuncStr(";")
-        => |items| StackItem::Stmts(Repeats::new(
-            RepeatsKind {
-                value: items[0]
+        => |items, _| StackItem::Stmts(Repeats::new(
+            RepeatsKind::new(items[0]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| expr.value)
-                    .map_err(|err| err.value),
-                next: None,
-            },
+                    .spanless(),
+            ),
             items[0].span().merge(items[1].span()),
         )),
         
         0 % Patt::Stmts, Patt::Stmts
-        => |items| {
+        => |items, _| {
             let mut stmts = items[0]
                 .clone()
                 .stmts_or_err()
@@ -74,9 +80,7 @@ fn print() {
                 .clone()
                 .stmts_or_err()
             {
-                Ok(stmts) => stmts.value.value
-                    .map(|expr| Spanned::new(expr, stmts.span.clone()))
-                    .map_err(|err| Spanned::new(err, stmts.span)),
+                Ok(stmts) => stmts.value.value.into_spanned(stmts.span),
                 Err(err) => Err(err),
             });
 
@@ -86,7 +90,7 @@ fn print() {
         // block
 
         0 % Patt::Brac('{'), Patt::Stmts, Patt::Brac('}')
-        => |items| StackItem::Expr(Expr::new(
+        => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: items[1]
                     .clone()
@@ -99,7 +103,7 @@ fn print() {
         )),
 
         0 % Patt::Brac('{'), Patt::Stmts, Patt::Expr, Patt::Brac('}')
-        => |items| StackItem::Expr(Expr::new(
+        => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: items[1]
                     .clone()
@@ -112,7 +116,7 @@ fn print() {
         )),
 
         0 % Patt::Brac('{'), Patt::Brac('}')
-        => |items| StackItem::Expr(Expr::new(
+        => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: vec![],
                 expr: None,
@@ -121,7 +125,7 @@ fn print() {
         )),
 
         0 % Patt::Brac('{'), Patt::Expr, Patt::Brac('}')
-        => |items| StackItem::Expr(Expr::new(
+        => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: vec![],
                 expr: Some(Box::new(items[1].clone().expr_or_err())),
@@ -131,61 +135,61 @@ fn print() {
 
         // let decl
 
-        2 % Patt::Kw("let"), Patt::Kw("mut"), Patt::Id
-        => |items| StackItem::LetDecl(LetDecl::new(
+        1 % Patt::Kw("let"), Patt::Kw("mut"), Patt::Id
+        => |items, _| StackItem::LetDecl(LetDecl::new(
             LetDeclKind {
                 mutable: Some(Spanned::new((), items[1].span().clone())),
                 id: items[2]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                    .map(|expr| expr.map_value(|expr| expr.id())),
                 ty: None,
             },
             items[0].span().merge(items[2].span()),
         )),
 
-        2 % Patt::Kw("let"), Patt::Id, Patt::PuncStr(":"), Patt::Id
-        => |items| StackItem::LetDecl(LetDecl::new(
+        1 % Patt::Kw("let"), Patt::Id, Patt::PuncStr(":"), Patt::Id
+        => |items, _| StackItem::LetDecl(LetDecl::new(
             LetDeclKind {
                 mutable: None,
                 id: items[1]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                    .map(|expr| expr.map_value(|expr| expr.id())),
                 ty: Some(items[3]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| Spanned::new(expr.value.id(), expr.span))
+                    .map(|expr| expr.map_value(|expr| expr.id()))
                 ),
             },
             items[0].span().merge(items[2].span()),
         )),
 
-        2 % Patt::Kw("let"), Patt::Kw("mut"), Patt::Id, Patt::PuncStr(":"), Patt::Id
-        => |items| StackItem::LetDecl(LetDecl::new(
+        1 % Patt::Kw("let"), Patt::Kw("mut"), Patt::Id, Patt::PuncStr(":"), Patt::Id
+        => |items, _| StackItem::LetDecl(LetDecl::new(
             LetDeclKind {
                 mutable: Some(Spanned::new((), items[0].span().clone())),
                 id: items[2]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                    .map(|expr| expr.map_value(|expr| expr.id())),
                 ty: Some(items[4]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                    .map(|expr| expr.map_value(|expr| expr.id())),
                 ),
             },
             items[0].span().merge(items[2].span()),
         )),
         
-        2 % Patt::Kw("let"), Patt::Id
-        => |items| StackItem::LetDecl(LetDecl::new(
+        1 % Patt::Kw("let"), Patt::Id
+        => |items, _| StackItem::LetDecl(LetDecl::new(
             LetDeclKind {
                 mutable: None,
                 id: items[1]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                    .map(|expr| expr.map_value(|expr| expr.id())),
                 ty: None,
             },
             items[0].span().merge(items[1].span()),
@@ -193,8 +197,8 @@ fn print() {
 
         // let expr
         
-        2 % Patt::LetDecl, Patt::PuncStr("="), Patt::Expr
-        => |items| items[0]
+        1 % Patt::LetDecl, Patt::PuncStr("="), Patt::Expr
+        => |items, _| items[0]
             .clone()
             .let_decl_or_err()
             .map(|let_decl| Expr::new(
@@ -208,8 +212,8 @@ fn print() {
             ))
             .into(),
         
-        2 % Patt::LetDecl
-        => |items| items[0]
+        1 % Patt::LetDecl
+        => |items, _| items[0]
             .clone()
             .let_decl_or_err()
             .map(|let_decl| Expr::new(
@@ -225,17 +229,17 @@ fn print() {
 
         // const expr
 
-        2 % Patt::Kw("const"), Patt::Id, Patt::PuncStr(":"), Patt::Id, Patt::PuncStr("="), Patt::Expr
-        => |items| StackItem::Expr(Expr::new(
+        1 % Patt::Kw("const"), Patt::Id, Patt::PuncStr(":"), Patt::Id, Patt::PuncStr("="), Patt::Expr
+        => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Const(ConstExpr {
                 id: items[1]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                    .map(|expr| expr.map_value(|expr| expr.id())),
                 ty: items[3]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| Spanned::new(expr.value.id(), expr.span)),
+                    .map(|expr| expr.map_value(|expr| expr.id())),
                 expr: Box::new(items[5].clone().expr_or_err()),
             }),
             items[0].span().merge(items[5].span()),
@@ -244,16 +248,13 @@ fn print() {
         // bin op
 
         0 % Patt::Expr, Patt::OpPunc, Patt::Expr
-        => |items| StackItem::Expr(Expr::new(
+        => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Bin(BinExpr {
                 lhs: Box::new(items[0].clone().expr_or_err()),
                 op: items[1]
                     .clone()
                     .token_or_err()
-                    .map(|t| Spanned::<String>::new(
-                        t.value.punc(),
-                        t.span,
-                    )),
+                    .map(|t| t.map_value(|t| t.punc())),
                 rhs: Box::new(items[2].clone().expr_or_err()),
             }),
             items[0].span().merge(items[2].span()),

@@ -51,6 +51,20 @@ impl<T> Spanned<T> {
             value,
         }
     }
+
+    pub fn map_value<F, R>(self, mut f: F) -> Spanned::<R>
+    where
+        F: FnMut(T) -> R
+    {
+        Spanned::new(f(self.value), self.span)
+    }
+
+    pub fn map_span<F>(self, mut f: F) -> Self
+    where
+        F: FnMut(Span) -> Span
+    {
+        Self::new(self.value, f(self.span))
+    }
 }
 
 impl<T> std::fmt::Display for Spanned<T>

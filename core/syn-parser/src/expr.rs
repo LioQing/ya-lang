@@ -6,7 +6,7 @@ pub enum ExprKind {
     Lit(LitToken),
 
     /** <id> */
-    Id(String),
+    Id(IdExpr),
 
     /** <paren> = (<expr>) */
     Paren(ParenExpr),
@@ -32,7 +32,7 @@ impl ExprKind {
         }
     }
 
-    pub fn id(self) -> String {
+    pub fn id(self) -> IdExpr {
         match self {
             ExprKind::Id(id) => id,
             _ => panic!("not an id"),
@@ -78,6 +78,12 @@ impl ExprKind {
 pub type Expr = Spanned<ExprKind>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct IdExpr {
+    pub id: Spanned<String>,
+    pub scope: Vec<Spanned<String>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ParenExpr {
     pub expr: Box<SynResult<Expr>>,
 }
@@ -91,15 +97,15 @@ pub struct BlockExpr {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct LetExpr {
     pub mutable: Option<Spanned<()>>,
-    pub id: SynResult<Spanned<String>>,
-    pub ty: Option<SynResult<Spanned<String>>>,
+    pub id: SynResult<Spanned<IdExpr>>,
+    pub ty: Option<SynResult<Spanned<IdExpr>>>,
     pub expr: Option<Box<SynResult<Expr>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ConstExpr {
-    pub id: SynResult<Spanned<String>>,
-    pub ty: SynResult<Spanned<String>>,
+    pub id: SynResult<Spanned<IdExpr>>,
+    pub ty: SynResult<Spanned<IdExpr>>,
     pub expr: Box<SynResult<Expr>>,
 }
 

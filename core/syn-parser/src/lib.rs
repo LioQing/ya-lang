@@ -13,9 +13,6 @@ pub use repeats::*;
 mod let_decl;
 pub use let_decl::*;
 
-mod ty;
-pub use ty::*;
-
 mod rule;
 pub use rule::*;
 
@@ -31,7 +28,6 @@ pub enum Assoc {
     Right,
 }
 
-pub type SynResult<T> = Result<T, Error>;
 #[derive(Debug)]
 pub struct Parser<'a> {
     pub lexer: std::iter::Peekable<lexer::Lexer<'a>>,
@@ -60,7 +56,7 @@ impl<'a> Parser<'a> {
             Ok(Token {
                 value: TokenKind::Id(id),
                 span
-            }) => StackItem::Expr(Expr::new(ExprKind::Id(id), span)),
+            }) => StackItem::Expr(Expr::new(ExprKind::Id(IdExpr { id: Spanned::new(id, span.clone()), scope: vec![] }), span)),
             Err(lexer::Error { value, span }) => StackItem::Err(Error::new(value.into(), span)),
             Ok(tok) => StackItem::Token(tok),
         }
@@ -123,15 +119,16 @@ impl<'a> Parser<'a> {
                 let curr_stack = &self.stack;
                 let reducibles = self.rules
                     .iter()
-                    .filter(|&rule| curr_stack
-                        .iter()
-                        .skip(match curr_stack.len().cmp(&rule.patt.len()) {
-                            std::cmp::Ordering::Less => return false,
-                            _ => curr_stack.len() - rule.patt.len(),
-                        })
-                        .zip(rule.patt.iter())
-                        .all(|(a, b)| b.match_item(a))
-                    );
+                    .filter(|&rule| {
+                        curr_stack
+                            .iter()
+                            .skip(match curr_stack.len().cmp(&rule.patt.len()) {
+                                std::cmp::Ordering::Less => return false,
+                                _ => curr_stack.len() - rule.patt.len(),
+                            })
+                            .zip(rule.patt.iter())
+                            .all(|(a, b)| b.match_item(a))
+                    });
 
                 let reduce_prec = reducibles
                     .clone()
@@ -169,7 +166,7 @@ impl<'a> Parser<'a> {
                             break;
                         }
 
-                        let item = (rule.reduce)(&self.stack[skip..]);
+                        let item = (rule.reduce)(&self.stack[skip..], next.as_ref());
 
                         self.stack.splice(skip.., std::iter::once(item));
                         reduced = true;
@@ -185,7 +182,10 @@ impl<'a> Parser<'a> {
                         {
                             break;
                         } else {
-                            panic!("reduce-reduce conflict: {reducibles:#?}")
+                            panic!("reduce-reduce conflict: {reducibles:#?}\nat line {}, col {}",
+                                self.stack.last().unwrap().span().line,
+                                self.stack.last().unwrap().span().col,
+                            )
                         }
                     },
                 }
@@ -204,10 +204,11 @@ impl<'a> Parser<'a> {
                     
                 let span = self.stack[skip].span().merge(self.stack.last().unwrap().span());
 
-                self.stack.splice(skip.., std::iter::once(StackItem::Err(Error::new(
+                self.stack.push(StackItem::Err(Error::new(
                     ErrorKind::UnknownSyntax,
                     span,
-                ))));
+                )));
+                break;
             } else if shiftables.is_empty() && next.is_none() {
                 break;
             } else {

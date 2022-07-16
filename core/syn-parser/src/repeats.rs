@@ -7,6 +7,10 @@ pub struct RepeatsKind<T> {
 }
 
 impl<T> RepeatsKind<T> {
+    pub fn new(value: Result<T, ErrorKind>) -> Self {
+        Self { value, next: None }
+    }
+
     pub fn push(&mut self, value: SynResult<Spanned<T>>) {
         let mut curr = self;
         while curr.next.is_some() {
@@ -19,10 +23,7 @@ impl<T> RepeatsKind<T> {
         };
 
         curr.next = Some(Box::new(Repeats {
-            value: RepeatsKind {
-                value,
-                next: None,
-            },
+            value: RepeatsKind::new(value),
             span,
         }));
     }

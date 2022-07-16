@@ -19,8 +19,9 @@ pub struct Rule {
     pub patt: Vec<Patt>,
     pub prec: i32,
 
+    /// reduction function, takes the matched patterns and next item, returns the reduced stack item
     #[derivative(Debug = "ignore", PartialEq = "ignore", Hash = "ignore")]
-    pub reduce: fn(&[StackItem]) -> StackItem,
+    pub reduce: fn(&[StackItem], Option<&StackItem>) -> StackItem,
 }
 
 macro_rules! patt {
@@ -86,7 +87,7 @@ macro_rules! patt {
                         &Self::Kw(a),
                         &StackItem::Token(Token { value: TokenKind::Kw(b), .. }),
                     ) if a == &b => true,
-                    (_, &StackItem::Err(_)) => true,
+                    // (_, &StackItem::Err(_)) => true,
                     _ => false,
                 }
             }
@@ -122,8 +123,8 @@ patt! {
     Expr,
     Stmts,
     LetDecl,
-    TyIds,
-    Ty,
+    ScopedId,
+    // Ty,
     ;
     op_punc = "!@#$%^&*=`?~|/+-<>",
 }

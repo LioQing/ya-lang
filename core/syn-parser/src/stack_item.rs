@@ -53,7 +53,7 @@ stack_items! {
     Expr => Expr,
     Stmts => Repeats<ExprKind>,
     LetDecl => LetDecl,
-    TyIds => Repeats<String>,
-    Ty => Ty,
+    ScopedId => Repeats<IdExpr>,
+    // Ty => Ty,
     Token => Token,
 }
