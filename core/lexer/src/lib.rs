@@ -328,7 +328,7 @@ impl<'a> Lexer<'a> {
         }
 
         const KEYWORDS: &'static [&'static str] = &[
-            "let", "const", "mut",
+            "let", "const", "mut",  "bin", "pre", "suf"
         ];
 
         const BOOL_KW: &'static [&'static str] = &[
@@ -354,20 +354,36 @@ impl<'a> Lexer<'a> {
         self.curr.peek().map_or(false, |c| c.is_ascii_whitespace())
     }
 
-    /// Skip all following whitespaces.
-    /// Returns number of skipped whitespace.
+    /// Skip all following whitespaces and comments.
+    /// Returns number of skipped characters.
     fn skip_whitespaces(&mut self) -> usize {
-        while self.is_next_whitespace() {
+        let mut in_line_comment = false;
+        let mut in_block_comment = false;
+
+        while self.is_next_whitespace() || in_line_comment || in_block_comment {
             match self.curr.next() {
                 Some(c) if c == '\n' => {
                     self.line += 1;
                     self.col = 0;
+                    in_line_comment = false;
                 },
                 _ => {
                     self.col += 1;
                 },
             }
+
+            match self.curr.clone().take(2).collect::<String>().as_str() {
+                "//" => in_line_comment = true,
+                "/*" => in_block_comment = true,
+                "*/" => {
+                    in_block_comment = false;
+                    self.curr.next();
+                    self.curr.next();
+                },
+                _ => (),
+            }
         }
+
         let count = self.curr.get_count();
         self.codepoint += count;
         count

@@ -3,7 +3,8 @@ use super::*;
 #[test]
 fn print() {
     let mut syn = Parser::new("
-    const main = () { }
+    /* const main =
+    () { } */
     ");
 
     syn.assoc = |prec| {
@@ -454,7 +455,7 @@ fn print() {
             items[0].span().merge(items[2].span()),
         )),
 
-        // bin op
+        // op
 
         0 % Patt::Expr, Patt::OpPunc, Patt::Expr
         => |items, _| StackItem::Expr(Expr::new(
