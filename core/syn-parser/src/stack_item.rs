@@ -54,6 +54,7 @@ stack_items! {
     Stmts => Repeats<ExprKind>,
     LetDecl => LetDecl,
     ScopedId => Repeats<IdExpr>,
-    // Ty => Ty,
+    ParamDecl => ParamDecl,
+    Params => Repeats<ParamDeclKind>,
     Token => Token,
 }

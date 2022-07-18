@@ -13,6 +13,9 @@ pub use repeats::*;
 mod let_decl;
 pub use let_decl::*;
 
+mod param_decl;
+pub use param_decl::*;
+
 mod rule;
 pub use rule::*;
 

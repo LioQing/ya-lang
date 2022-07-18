@@ -20,6 +20,9 @@ pub enum ExprKind {
     /** <const> = const <id>: <ty> = <const expr> */
     Const(ConstExpr),
 
+    /** <fn> = ([[mut]? <id>: <ty>],*) [-> <ty>]? [<block> | => <expr>] */
+    Fn(FnExpr),
+
     /** <bin> = <expr> <punc as bin op> <expr> */
     Bin(BinExpr),
 }
@@ -107,6 +110,13 @@ pub struct ConstExpr {
     pub id: SynResult<Spanned<IdExpr>>,
     pub ty: SynResult<Spanned<IdExpr>>,
     pub expr: Box<SynResult<Expr>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct FnExpr {
+    pub params: Vec<SynResult<ParamDecl>>,
+    pub ret: Option<SynResult<Spanned<IdExpr>>>,
+    pub body: Box<SynResult<Expr>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

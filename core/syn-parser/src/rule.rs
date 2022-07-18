@@ -124,7 +124,8 @@ patt! {
     Stmts,
     LetDecl,
     ScopedId,
-    // Ty,
+    ParamDecl,
+    Params,
     ;
     op_punc = "!@#$%^&*=`?~|/+-<>",
 }
