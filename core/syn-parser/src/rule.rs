@@ -25,10 +25,21 @@ pub struct Rule {
 }
 
 macro_rules! patt {
-    ($($custom_stack_item:ident),* $(,)? $(; op_punc = $ops:literal $(,)?)?) => {
+    (
+        $(
+            $custom_stack_item:ident
+        ),* $(,)? ;
+        $(
+            $custom_pat:ident @
+            $custom_match:pat
+        ),* $(,)? =>
+        $(op_punc = $ops:literal)?
+    ) => {
         #[derive(Debug, PartialEq, Eq, Clone, Hash)]
         pub enum Patt {
             $($custom_stack_item,)*
+
+            $($custom_pat,)*
 
             /** brackets */
             Brac(char),
@@ -58,6 +69,10 @@ macro_rules! patt {
                     $((
                         &Self::$custom_stack_item,
                         &StackItem::$custom_stack_item(_),
+                    ))|* => true,
+                    $((
+                        &Self::$custom_pat,
+                        $custom_match
                     ))|*
                     | (
                         &Self::Punc,
@@ -87,7 +102,6 @@ macro_rules! patt {
                         &Self::Kw(a),
                         &StackItem::Token(Token { value: TokenKind::Kw(b), .. }),
                     ) if a == &b => true,
-                    // (_, &StackItem::Err(_)) => true,
                     _ => false,
                 }
             }
@@ -126,6 +140,9 @@ patt! {
     ScopedId,
     ParamDecl,
     Params,
+    FnDecl,
     ;
-    op_punc = "!@#$%^&*=`?~|/+-<>",
+    Block @ StackItem::Expr(Expr { value: ExprKind::Block(_), .. }),
+    =>
+    op_punc = "!@#$%^&*=`?~|/+-<>"
 }

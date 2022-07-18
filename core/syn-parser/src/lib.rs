@@ -16,6 +16,9 @@ pub use let_decl::*;
 mod param_decl;
 pub use param_decl::*;
 
+mod fn_decl;
+pub use fn_decl::*;
+
 mod rule;
 pub use rule::*;
 

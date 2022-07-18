@@ -17,7 +17,7 @@ pub enum ExprKind {
     /** <let> = let [mut]? <id> [: <ty>]? [= <expr>]? */
     Let(LetExpr),
 
-    /** <const> = const <id>: <ty> = <const expr> */
+    /** <const> = const <id> [: <built-in ty>]? = <const expr> */
     Const(ConstExpr),
 
     /** <fn> = ([[mut]? <id>: <ty>],*) [-> <ty>]? [<block> | => <expr>] */
@@ -108,14 +108,13 @@ pub struct LetExpr {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ConstExpr {
     pub id: SynResult<Spanned<IdExpr>>,
-    pub ty: SynResult<Spanned<IdExpr>>,
+    pub ty: Option<SynResult<Spanned<IdExpr>>>,
     pub expr: Box<SynResult<Expr>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct FnExpr {
-    pub params: Vec<SynResult<ParamDecl>>,
-    pub ret: Option<SynResult<Spanned<IdExpr>>>,
+    pub decl: SynResult<FnDecl>,
     pub body: Box<SynResult<Expr>>,
 }
 

@@ -56,5 +56,6 @@ stack_items! {
     ScopedId => Repeats<IdExpr>,
     ParamDecl => ParamDecl,
     Params => Repeats<ParamDeclKind>,
+    FnDecl => FnDecl,
     Token => Token,
 }

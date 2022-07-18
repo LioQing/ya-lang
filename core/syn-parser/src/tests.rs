@@ -3,14 +3,11 @@ use super::*;
 #[test]
 fn print() {
     let mut syn = Parser::new("
-    let main = (arg: String) => {
-        let mut a: my_scope::MyType = 10;
-        a
-    }
+    const main = () { }
     ");
 
     syn.assoc = |prec| {
-        if [2, 3].contains(&prec) {
+        if [-1, 2, 3].contains(&prec) {
             Assoc::Right
         } else {
             Assoc::Left
@@ -236,13 +233,27 @@ fn print() {
                     .clone()
                     .expr_or_err()
                     .map(|expr| expr.map_value(|expr| expr.id())),
-                ty: items[3]
+                ty: Some(items[3]
                     .clone()
                     .expr_or_err()
-                    .map(|expr| expr.map_value(|expr| expr.id())),
+                    .map(|expr| expr.map_value(|expr| expr.id()))
+                ),
                 expr: Box::new(items[5].clone().expr_or_err()),
             }),
             items[0].span().merge(items[5].span()),
+        )),
+
+        2 % Patt::Kw("const"), Patt::Id, Patt::PuncStr("="), Patt::Expr
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Const(ConstExpr {
+                id: items[1]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.id())),
+                ty: None,
+                expr: Box::new(items[3].clone().expr_or_err()),
+            }),
+            items[0].span().merge(items[3].span()),
         )),
 
         // param decl
@@ -306,40 +317,141 @@ fn print() {
             StackItem::Params(Repeats::new(params.value, items[0].span().clone()))
         },
 
-        // fn expr
+        // fn decl
 
-        -1 % Patt::Brac('('), Patt::Params, Patt::Brac(')'), Patt::PuncStr("=>"), Patt::Expr
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::Fn(FnExpr {
+        2 % Patt::Brac('('), Patt::Params, Patt::Brac(')')
+        => |items, _| StackItem::FnDecl(FnDecl::new(
+            FnDeclKind {
                 params: items[1]
                     .clone()
                     .params_or_err()
                     .unwrap()
                     .into_value_vec(),
                 ret: None,
-                body: Box::new(items[4]
+            },
+            items[0].span().merge(items[2].span()),
+        )),
+
+        2 % Patt::Brac('('), Patt::Params, Patt::PuncStr(","), Patt::Brac(')')
+        => |items, _| StackItem::FnDecl(FnDecl::new(
+            FnDeclKind {
+                params: items[1]
+                    .clone()
+                    .params_or_err()
+                    .unwrap()
+                    .into_value_vec(),
+                ret: None,
+            },
+            items[0].span().merge(items[3].span()),
+        )),
+
+        2 % Patt::Brac('('), Patt::Params, Patt::Brac(')'), Patt::PuncStr("->"), Patt::Id
+        => |items, _| StackItem::FnDecl(FnDecl::new(
+            FnDeclKind {
+                params: items[1]
+                    .clone()
+                    .params_or_err()
+                    .unwrap()
+                    .into_value_vec(),
+                ret: Some(items[4]
                     .clone()
                     .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.id()))
                 ),
-            }),
+            },
             items[0].span().merge(items[4].span()),
         )),
 
-        -1 % Patt::Brac('('), Patt::Params, Patt::PuncStr(","), Patt::Brac(')'), Patt::PuncStr("=>"), Patt::Expr
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::Fn(FnExpr {
+        2 %
+            Patt::Brac('('), Patt::Params, Patt::PuncStr(","), Patt::Brac(')'),
+            Patt::PuncStr("->"), Patt::Id,
+        => |items, _| StackItem::FnDecl(FnDecl::new(
+            FnDeclKind {
                 params: items[1]
                     .clone()
                     .params_or_err()
                     .unwrap()
                     .into_value_vec(),
-                ret: None,
-                body: Box::new(items[5]
+                ret: Some(items[5]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.id()))
+                ),
+            },
+            items[0].span().merge(items[5].span()),
+        )),
+
+        2 % Patt::Brac('('), Patt::Brac(')'), Patt::PuncStr("->"), Patt::Id,
+        => |items, _| StackItem::FnDecl(FnDecl::new(
+            FnDeclKind {
+                params: vec![],
+                ret: Some(items[3]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.id()))
+                ),
+            },
+            items[0].span().merge(items[3].span()),
+        )),
+
+        // fn expr
+
+        -2 % Patt::FnDecl, Patt::PuncStr("=>"), Patt::Expr,
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Fn(FnExpr {
+                decl: items[0]
+                    .clone()
+                    .fn_decl_or_err(),
+                body: Box::new(items[2]
                     .clone()
                     .expr_or_err()
                 ),
             }),
-            items[0].span().merge(items[5].span()),
+            items[0].span().merge(items[2].span()),
+        )),
+
+        -2 % Patt::Brac('('), Patt::Brac(')'), Patt::PuncStr("=>"), Patt::Expr,
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Fn(FnExpr {
+                decl: Ok(FnDecl::new(
+                    FnDeclKind { params: vec![], ret: None },
+                    items[0].span().merge(items[1].span()),
+                )),
+                body: Box::new(items[3]
+                    .clone()
+                    .expr_or_err()
+                ),
+            }),
+            items[0].span().merge(items[3].span()),
+        )),
+
+        -2 % Patt::FnDecl, Patt::Block,
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Fn(FnExpr {
+                decl: items[0]
+                    .clone()
+                    .fn_decl_or_err(),
+                body: Box::new(items[1]
+                    .clone()
+                    .expr_or_err()
+                ),
+            }),
+            items[0].span().merge(items[1].span()),
+        )),
+
+        -2 % Patt::Brac('('), Patt::Brac(')'), Patt::Block,
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Fn(FnExpr {
+                decl: Ok(FnDecl::new(
+                    FnDeclKind { params: vec![], ret: None },
+                    items[0].span().merge(items[1].span()),
+                )),
+                body: Box::new(items[2]
+                    .clone()
+                    .expr_or_err()
+                ),
+            }),
+            items[0].span().merge(items[2].span()),
         )),
 
         // bin op
