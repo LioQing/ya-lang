@@ -40,15 +40,15 @@ pub struct Parser<'a> {
     pub rules: HashSet<Rule>,
     pub assoc: fn(i32) -> Assoc,
 
-    stack: Vec<StackItem>,
+    pub stack: Vec<StackItem>,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(code: &'a str) -> Parser<'a> {
         Parser {
             lexer: lexer::Lexer::new(code).peekable(),
-            rules: [].into(),
-            assoc: |_| Assoc::Left,
+            rules: get_rules(),
+            assoc: get_assoc_fn(),
             stack: vec![],
         }
     }

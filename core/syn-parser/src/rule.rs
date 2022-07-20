@@ -31,8 +31,7 @@ macro_rules! patt {
         $(
             $custom_pat:ident @
             $custom_match:pat
-        ),* $(,)? =>
-        $(op_punc = $ops:literal)?
+        ),* $(,)?
     ) => {
         #[derive(Debug, PartialEq, Eq, Clone, Hash)]
         pub enum Patt {
@@ -52,11 +51,14 @@ macro_rules! patt {
             /** punctuation */
             Punc,
 
-            /** operator punctuations */
-            OpPunc,
+            /** operator */
+            Op,
 
             /** specific punctuation */
             PuncStr(&'static str),
+
+            /** specific operator */
+            OpStr(&'static str),
 
             /** identifiers */
             Id,
@@ -81,6 +83,10 @@ macro_rules! patt {
                         &StackItem::Token(Token { value: TokenKind::Punc(_), .. }),
                     )
                     | (
+                        &Self::Op,
+                        &StackItem::Token(Token { value: TokenKind::Op(_), .. }),
+                    )
+                    | (
                         &Self::AnyBrac,
                         &StackItem::Token(Token { value: TokenKind::Brac(_), .. }),
                     )
@@ -88,13 +94,13 @@ macro_rules! patt {
                         &Self::Id,
                         &StackItem::Expr(Expr { value: ExprKind::Id(_), .. }),
                     ) => true,
-                    $((
-                        &Self::OpPunc,
-                        &StackItem::Token(Token { value: TokenKind::Punc(b), .. }),
-                    ) if b.chars().all(|c| $ops.contains(c)) => true,)?
                     (
                         &Self::PuncStr(a),
                         &StackItem::Token(Token { value: TokenKind::Punc(b), .. }),
+                    ) if a == &b => true,
+                    (
+                        &Self::OpStr(a),
+                        &StackItem::Token(Token { value: TokenKind::Op(b), .. }),
                     ) if a == &b => true,
                     (
                         &Self::Brac(a),
@@ -149,8 +155,13 @@ patt! {
     FnDecl,
     ;
     Block @ StackItem::Expr(Expr { value: ExprKind::Block(_), .. }),
-    =>
-    op_punc = "!@#$%^&*=`?~|/+-<>"
+}
+
+pub fn get_assoc_fn() -> fn(i32) -> Assoc {
+    |prec| match prec {
+        -1 | 2 | 3 => Assoc::Right,
+        _ => Assoc::Left,
+    }
 }
 
 pub fn get_rules() -> HashSet<Rule> {
@@ -164,7 +175,7 @@ pub fn get_rules() -> HashSet<Rule> {
         let op = op
             .clone()
             .token_or_err()
-            .map(|t| t.map_value(|t| t.punc()));
+            .map(|t| t.map_value(|t| t.op()));
 
         match item {
             Ok(Expr { value: ExprKind::Un(mut un_expr), .. }) => {
@@ -382,7 +393,7 @@ pub fn get_rules() -> HashSet<Rule> {
 
         // let expr
         
-        2 % Patt::LetDecl, Patt::PuncStr("="), Patt::Expr
+        2 % Patt::LetDecl, Patt::OpStr("="), Patt::Expr
         => |items, _| items[0]
             .clone()
             .let_decl_or_err()
@@ -414,7 +425,7 @@ pub fn get_rules() -> HashSet<Rule> {
 
         // const expr
 
-        2 % Patt::Kw("const"), Patt::Id, Patt::PuncStr(":"), Patt::Id, Patt::PuncStr("="), Patt::Expr
+        2 % Patt::Kw("const"), Patt::Id, Patt::PuncStr(":"), Patt::Id, Patt::OpStr("="), Patt::Expr
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Const(ConstExpr {
                 id: items[1]
@@ -431,7 +442,7 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[5].span()),
         )),
 
-        2 % Patt::Kw("const"), Patt::Id, Patt::PuncStr("="), Patt::Expr
+        2 % Patt::Kw("const"), Patt::Id, Patt::OpStr("="), Patt::Expr
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Const(ConstExpr {
                 id: items[1]
@@ -644,39 +655,39 @@ pub fn get_rules() -> HashSet<Rule> {
 
         // op
 
-        0 % Patt::Expr, Patt::OpPunc, Patt::Expr
+        0 % Patt::Expr, Patt::Op, Patt::Expr
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Bin(BinExpr {
                 lhs: Box::new(items[0].clone().expr_or_err()),
                 op: items[1]
                     .clone()
                     .token_or_err()
-                    .map(|t| t.map_value(|t| t.punc())),
+                    .map(|t| t.map_value(|t| t.op())),
                 rhs: Box::new(items[2].clone().expr_or_err()),
             }),
             items[0].span().merge(items[2].span()),
         )),
 
-        0 % Patt::Expr, Patt::OpPunc, Patt::OpPunc, Patt::OpPunc, Patt::OpPunc, Patt::Expr
+        0 % Patt::Expr, Patt::Op, Patt::Op, Patt::Op, Patt::Op, Patt::Expr
         => |items, _| StackItem::Err(Error::new(
             ErrorKind::AmbiguousOps,
             items[0].span().merge(items[5].span()),
         )),
 
-        0 % Patt::Expr, Patt::OpPunc, Patt::OpPunc, Patt::OpPunc, Patt::Expr
+        0 % Patt::Expr, Patt::Op, Patt::Op, Patt::Op, Patt::Expr
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Bin(BinExpr {
                 lhs: Box::new(add_un_op(&items[0], false, &items[1])),
                 op: items[2]
                     .clone()
                     .token_or_err()
-                    .map(|t| t.map_value(|t| t.punc())),
+                    .map(|t| t.map_value(|t| t.op())),
                 rhs: Box::new(add_un_op(&items[4], true, &items[3])),
             }),
             items[0].span().merge(items[4].span()),
         )),
 
-        0 % Patt::Expr, Patt::OpPunc, Patt::OpPunc, Patt::Expr
+        0 % Patt::Expr, Patt::Op, Patt::Op, Patt::Expr
         => |items, _| match items[1].span().dist_from_prev.cmp(&items[3].span().dist_from_prev) {
             std::cmp::Ordering::Less => StackItem::Expr(Expr::new(
                 ExprKind::Bin(BinExpr {
@@ -684,7 +695,7 @@ pub fn get_rules() -> HashSet<Rule> {
                     op: items[2]
                         .clone()
                         .token_or_err()
-                        .map(|t| t.map_value(|t| t.punc())),
+                        .map(|t| t.map_value(|t| t.op())),
                     rhs: Box::new(items[3].clone().expr_or_err()),
                 }),
                 items[0].span().merge(items[3].span()),
@@ -695,7 +706,7 @@ pub fn get_rules() -> HashSet<Rule> {
                     op: items[1]
                         .clone()
                         .token_or_err()
-                        .map(|t| t.map_value(|t| t.punc())),
+                        .map(|t| t.map_value(|t| t.op())),
                     rhs: Box::new(add_un_op(&items[3], true, &items[2])),
                 }),
                 items[0].span().merge(items[3].span()),
@@ -706,13 +717,12 @@ pub fn get_rules() -> HashSet<Rule> {
             )),
         },
 
-        0 % Patt::OpPunc, Patt::Expr
+        0 % Patt::Op, Patt::Expr
         => |items, _| add_un_op(&items[1], true, &items[0]).into(),
 
-        0 % Patt::Expr, Patt::OpPunc
+        0 % Patt::Expr, Patt::Op
         => |items, next| match next {
-            Some(x) if Patt::OpPunc.match_item(x)
-                || !Patt::Punc.match_item(x) && !Patt::AnyBrac.match_item(x) =>
+            Some(x) if !Patt::Punc.match_item(x) && !Patt::AnyBrac.match_item(x) =>
             {
                 StackItem::None
             },
@@ -735,5 +745,11 @@ pub fn get_rules() -> HashSet<Rule> {
                 _ => add_un_op(&items[0], false, &items[1]).into(),
             }
         },
+
+        1 % Patt::Op, Patt::Brac('(')
+        => |_, _| StackItem::None,
+
+        1 % Patt::Op, Patt::Brac('{')
+        => |_, _| StackItem::None,
     }
 }

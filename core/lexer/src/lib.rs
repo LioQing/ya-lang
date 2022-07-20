@@ -56,6 +56,8 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    const OP_CHAR: &'static str = "!@#$%^&*=`?~|/+-<>";
+
     /// Create from a string.
     pub fn new(src: &'a str) -> Self {
         Self {
@@ -218,9 +220,10 @@ impl<'a> Lexer<'a> {
     /// Tokenize punctuation.
     fn tokenize_punc(&mut self, first: char) -> Result<Token, Error> {
         let mut raw = first.to_string();
-        
+
         while let Some(&c) = self.curr.peek() {
             if !c.is_ascii_punctuation()
+                || Self::OP_CHAR.contains(c)
                 || c == '_'
                 || ['(', '{', '[', ')', '}', ']'].contains(&c)
             {
@@ -233,6 +236,24 @@ impl<'a> Lexer<'a> {
 
         Ok(Token::new_value(
             TokenKind::Punc(raw),
+        ))
+    }
+
+    /// Tokenize operator.
+    fn tokenize_op(&mut self, first: char) -> Result<Token, Error> {
+        let mut raw = first.to_string();
+
+        while let Some(&c) = self.curr.peek() {
+            if !Self::OP_CHAR.contains(c) {
+                break;
+            }
+            
+            raw.push(c);
+            self.curr.next();
+        }
+
+        Ok(Token::new_value(
+            TokenKind::Op(raw),
         ))
     }
 
@@ -429,7 +450,13 @@ impl<'a> std::iter::Iterator for Lexer<'a> {
                     _ => self.tokenize_punc('.'),
                 },
                 c @ ('"' | '\'') => self.tokenize_quote(c, "".to_owned()),
-                c if c != '_' && c.is_ascii_punctuation() => self.tokenize_punc(c),
+                c if c != '_' && c.is_ascii_punctuation() => {
+                    if Self::OP_CHAR.contains(c) {
+                        self.tokenize_op(c)
+                    } else {
+                        self.tokenize_punc(c)
+                    }
+                },
                 c if !c.is_ascii_whitespace() => self.tokenize_id_or_kw(c),
                 _ => unreachable!(),
             });

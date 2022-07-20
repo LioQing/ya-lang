@@ -88,6 +88,9 @@ pub enum TokenKind {
     /** punctuation */
     Punc(String),
 
+    /** operators */
+    Op(String),
+
     /** identifiers */
     Id(String),
 
@@ -117,6 +120,13 @@ impl TokenKind {
         }
     }
 
+    pub fn op(self) -> String {
+        match self {
+            TokenKind::Op(o) => o,
+            _ => panic!("not an operator token"),
+        }
+    }
+
     pub fn id(self) -> String {
         match self {
             TokenKind::Id(i) => i,
@@ -136,7 +146,10 @@ impl std::fmt::Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let display = match self {
             Self::Brac(BracToken { raw, .. }) => raw.to_string(),
-            Self::Punc(raw) | Self::Id(raw) | Self::Kw(raw) => raw.clone(),
+            Self::Punc(raw)
+            | Self::Op(raw)
+            | Self::Id(raw)
+            | Self::Kw(raw) => raw.clone(),
             Self::Lit(LitToken { raw, prefix, suffix, .. }) => {
                 raw.clone() + prefix.as_str() + suffix.as_str()
             },
