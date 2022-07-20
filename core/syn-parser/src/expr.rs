@@ -27,10 +27,8 @@ pub enum ExprKind {
     Bin(BinExpr),
 
     /** <pre> = <punc as pre op> <expr> */
-    Pre(UnExpr),
-
     /** <suf> = <expr> <punc as suf op> */
-    Suf(UnExpr),
+    Un(UnExpr),
 }
 
 impl ExprKind {
@@ -134,5 +132,6 @@ pub struct BinExpr {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct UnExpr {
     pub expr: Box<SynResult<Expr>>,
-    pub op: SynResult<Spanned<String>>,
+    pub pre: Vec<SynResult<Spanned<String>>>,
+    pub suf: Vec<SynResult<Spanned<String>>>,
 }

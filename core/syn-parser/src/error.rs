@@ -9,6 +9,9 @@ pub enum ErrorKind {
 
     #[error("Unknown Syntax")]
     UnknownSyntax,
+
+    #[error("Ambiguous operators, add space in proper position to distinguish")]
+    AmbiguousOps,
 }
 
 /// Syntax error.

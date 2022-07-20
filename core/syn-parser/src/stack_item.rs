@@ -7,6 +7,7 @@ macro_rules! stack_items {
         pub enum StackItem {
             $($name($typename),)*
             Err(Error),
+            None,
         }
         
         impl StackItem {
@@ -15,7 +16,8 @@ macro_rules! stack_items {
                     $(Self::$name(token::Spanned { span, .. }))|*
                     | &Self::Err(Error { span, .. }) => {
                         span
-                    }
+                    },
+                    Self::None => panic!("the stack item is none"),
                 }
             }
 

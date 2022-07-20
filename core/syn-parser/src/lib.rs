@@ -104,7 +104,6 @@ impl<'a> Parser<'a> {
                 None => None,
             };
 
-            let mut reduced = false;
             let mut shiftables;
             loop {
                 // shifts
@@ -155,12 +154,10 @@ impl<'a> Parser<'a> {
 
                 match reducibles.len() {
                     0 => {
-                        reduced = reduced || false;
                         break;
                     },
                     1 => {
                         let rule = reducibles.into_iter().next().unwrap();
-                        let skip = self.stack.len() - rule.patt.len();
 
                         if shift_prec
                             .map(|prec|
@@ -171,11 +168,16 @@ impl<'a> Parser<'a> {
                         {
                             break;
                         }
-
+                        
+                        let skip = self.stack.len() - rule.patt.len();
                         let item = (rule.reduce)(&self.stack[skip..], next.as_ref());
 
+                        if let StackItem::None = item {
+                            println!("skipped\n");
+                            break;
+                        }
+
                         self.stack.splice(skip.., std::iter::once(item));
-                        reduced = true;
                         println!("reduced\n");
                     },
                     _ => {
@@ -188,34 +190,39 @@ impl<'a> Parser<'a> {
                         {
                             break;
                         } else {
-                            panic!("reduce-reduce conflict: {reducibles:#?}\nat line {}, col {}",
-                                self.stack.last().unwrap().span().line,
-                                self.stack.last().unwrap().span().col,
-                            )
+                            let max_len = reducibles
+                                .iter()
+                                .map(|&rule| rule.patt.len())
+                                .max()
+                                .unwrap();
+                            
+                            let rule = reducibles
+                                .iter()
+                                .filter(|&&rule| rule.patt.len() == max_len)
+                                .collect::<Vec<_>>();
+                            
+                            let rule = if rule.len() > 1 {
+                                panic!("reduce-reduce conflict:\n{rule:#?}");
+                            } else {
+                                **rule.first().unwrap()
+                            };
+
+                            let skip = self.stack.len() - rule.patt.len();
+                            let item = (rule.reduce)(&self.stack[skip..], next.as_ref());
+
+                            if let StackItem::None = item {
+                                println!("skipped\n");
+                                break;
+                            }
+
+                            self.stack.splice(skip.., std::iter::once(item));
+                            println!("reduced\n");
                         }
                     },
                 }
             }
-
-            if shiftables.is_empty() && next.is_none() && !reduced {
-                let skip = self.stack.len() - self.stack
-                    .iter()
-                    .rev()
-                    .take_while(|&item| !matches!(item, &StackItem::Expr(_)))
-                    .count();
-
-                if skip == self.stack.len() {
-                    break;
-                }
-                    
-                let span = self.stack[skip].span().merge(self.stack.last().unwrap().span());
-
-                self.stack.push(StackItem::Err(Error::new(
-                    ErrorKind::UnknownSyntax,
-                    span,
-                )));
-                break;
-            } else if shiftables.is_empty() && next.is_none() {
+            
+            if shiftables.is_empty() && next.is_none() {
                 break;
             } else {
                 self.stack.push(next.unwrap());
