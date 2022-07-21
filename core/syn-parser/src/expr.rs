@@ -29,6 +29,9 @@ pub enum ExprKind {
     /** <pre> = <punc as pre op> <expr> */
     /** <suf> = <expr> <punc as suf op> */
     Un(UnExpr),
+
+    /** <if> = if <expr of bool> <block> [else [<block> | <if>]]?*/
+    If(IfExpr),
 }
 
 impl ExprKind {
@@ -78,6 +81,20 @@ impl ExprKind {
         match self {
             ExprKind::Bin(bin) => bin,
             _ => panic!("not a bin"),
+        }
+    }
+
+    pub fn un(self) -> UnExpr {
+        match self {
+            ExprKind::Un(un) => un,
+            _ => panic!("not a un"),
+        }
+    }
+
+    pub fn if_(self) -> IfExpr {
+        match self {
+            ExprKind::If(if_) => if_,
+            _ => panic!("not an if"),
         }
     }
 }
@@ -134,4 +151,11 @@ pub struct UnExpr {
     pub expr: Box<SynResult<Expr>>,
     pub pre: Vec<SynResult<Spanned<String>>>,
     pub suf: Vec<SynResult<Spanned<String>>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct IfExpr {
+    pub condition: Box<SynResult<Expr>>,
+    pub body: Box<SynResult<Spanned<BlockExpr>>>,
+    pub else_expr: Option<Box<SynResult<Expr>>>,
 }

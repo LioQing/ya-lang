@@ -32,7 +32,7 @@ macro_rules! assert_stack {
 fn print() {
     println!("{:#?}", parse!("
         const my_fn = const b = () {
-            let a = 1 * (2 + *ptr);
+            let a = if a { 1 * (2 + *ptr) } else { b };
             a
         }
     "));
@@ -86,8 +86,8 @@ fn block() {
         Patt::Block,
     );
 
-    // TODO: support regex Patt, to reduce multiple ; to one ;
     assert_stack!(
+        dbg
         parse!("{;;;}"),
         Patt::Block,
     );

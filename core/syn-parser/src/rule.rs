@@ -97,11 +97,11 @@ macro_rules! patt {
                     (
                         &Self::PuncStr(a),
                         &StackItem::Token(Token { value: TokenKind::Punc(b), .. }),
-                    ) if a == &b => true,
+                    ) if regex::Regex::new(a).unwrap().is_match(&b) => true,
                     (
                         &Self::OpStr(a),
                         &StackItem::Token(Token { value: TokenKind::Op(b), .. }),
-                    ) if a == &b => true,
+                    ) if regex::Regex::new(a).unwrap().is_match(&b) => true,
                     (
                         &Self::Brac(a),
                         &StackItem::Token(Token { value: TokenKind::Brac(BracToken { raw: b, .. }), .. }),
@@ -113,7 +113,7 @@ macro_rules! patt {
                     (
                         &Self::Kw(a),
                         &StackItem::Token(Token { value: TokenKind::Kw(b), .. }),
-                    ) if a == &b => true,
+                    ) if regex::Regex::new(a).unwrap().is_match(&b) => true,
                     _ => false,
                 }
             }
@@ -264,6 +264,13 @@ pub fn get_rules() -> HashSet<Rule> {
             ),
             items[0].span().merge(items[1].span()),
         )),
+
+        0 % Patt::PuncStr(";;+")
+        => |items, _| items[0]
+            .clone()
+            .token_or_err()
+            .map(|t| t.map_value(|_| TokenKind::Punc(";".to_owned())))
+            .into(),
         
         0 % Patt::Stmts, Patt::Stmts
         => |items, _| {
@@ -312,6 +319,15 @@ pub fn get_rules() -> HashSet<Rule> {
         )),
 
         0 % Patt::Brac('{'), Patt::Brac('}')
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Block(BlockExpr {
+                stmts: vec![],
+                expr: None,
+            }),
+            items[0].span().merge(items[1].span()),
+        )),
+
+        0 % Patt::Brac('{'), Patt::PuncStr(";"), Patt::Brac('}')
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: vec![],
@@ -751,5 +767,37 @@ pub fn get_rules() -> HashSet<Rule> {
 
         1 % Patt::Op, Patt::Brac('{')
         => |_, _| StackItem::None,
+
+        // if
+
+        2 % Patt::Kw("if"), Patt::Expr, Patt::Block
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::If(IfExpr {
+                condition: Box::new(items[1].clone().expr_or_err()),
+                body: Box::new(items[2]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.block()))
+                ),
+                else_expr: None,
+            }),
+            items[0].span().merge(items[2].span()),
+        )),
+
+        2 %
+            Patt::Kw("if"), Patt::Expr, Patt::Block,
+            Patt::Kw("else"), Patt::Block
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::If(IfExpr {
+                condition: Box::new(items[1].clone().expr_or_err()),
+                body: Box::new(items[2]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.block()))
+                ),
+                else_expr: Some(Box::new(items[4].clone().expr_or_err())),
+            }),
+            items[0].span().merge(items[4].span()),
+        )),
     }
 }
