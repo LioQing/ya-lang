@@ -155,11 +155,16 @@ patt! {
     FnDecl,
     ;
     Block @ StackItem::Expr(Expr { value: ExprKind::Block(_), .. }),
+    Paren @ StackItem::Expr(Expr { value: ExprKind::Paren(_), .. }),
+    Let @ StackItem::Expr(Expr { value: ExprKind::Let(_), .. }),
+    Const @ StackItem::Expr(Expr { value: ExprKind::Const(_), .. }),
+    Fn @ StackItem::Expr(Expr { value: ExprKind::Fn(_), .. }),
+    If @ StackItem::Expr(Expr { value: ExprKind::If(_), .. }),
 }
 
 pub fn get_assoc_fn() -> fn(i32) -> Assoc {
     |prec| match prec {
-        -1 | 2 | 3 => Assoc::Right,
+        -2 | -1 | 2 | 3 => Assoc::Right,
         _ => Assoc::Left,
     }
 }
@@ -251,6 +256,14 @@ pub fn get_rules() -> HashSet<Rule> {
                 expr: Box::new(items[1].clone().expr_or_err()),
             }),
             items[0].span().merge(items[2].span()),
+        )),
+
+        // unit
+
+        -3 % Patt::Brac('('), Patt::Brac(')')
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Unit,
+            items[0].span().merge(items[1].span()),
         )),
 
         // stmts
@@ -560,7 +573,7 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[3].span()),
         )),
 
-        2 % Patt::Brac('('), Patt::Params, Patt::Brac(')'), Patt::PuncStr("->"), Patt::Id
+        2 % Patt::Brac('('), Patt::Params, Patt::Brac(')'), Patt::OpStr("->"), Patt::Id
         => |items, _| StackItem::FnDecl(FnDecl::new(
             FnDeclKind {
                 params: items[1]
@@ -596,7 +609,7 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[5].span()),
         )),
 
-        2 % Patt::Brac('('), Patt::Brac(')'), Patt::PuncStr("->"), Patt::Id,
+        2 % Patt::Brac('('), Patt::Brac(')'), Patt::OpStr("->"), Patt::Id,
         => |items, _| StackItem::FnDecl(FnDecl::new(
             FnDeclKind {
                 params: vec![],
@@ -611,35 +624,6 @@ pub fn get_rules() -> HashSet<Rule> {
 
         // fn expr
 
-        -2 % Patt::FnDecl, Patt::PuncStr("=>"), Patt::Expr,
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::Fn(FnExpr {
-                decl: items[0]
-                    .clone()
-                    .fn_decl_or_err(),
-                body: Box::new(items[2]
-                    .clone()
-                    .expr_or_err()
-                ),
-            }),
-            items[0].span().merge(items[2].span()),
-        )),
-
-        -2 % Patt::Brac('('), Patt::Brac(')'), Patt::PuncStr("=>"), Patt::Expr,
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::Fn(FnExpr {
-                decl: Ok(FnDecl::new(
-                    FnDeclKind { params: vec![], ret: None },
-                    items[0].span().merge(items[1].span()),
-                )),
-                body: Box::new(items[3]
-                    .clone()
-                    .expr_or_err()
-                ),
-            }),
-            items[0].span().merge(items[3].span()),
-        )),
-
         -2 % Patt::FnDecl, Patt::Block,
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Fn(FnExpr {
@@ -649,6 +633,7 @@ pub fn get_rules() -> HashSet<Rule> {
                 body: Box::new(items[1]
                     .clone()
                     .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.block()))
                 ),
             }),
             items[0].span().merge(items[1].span()),
@@ -664,9 +649,28 @@ pub fn get_rules() -> HashSet<Rule> {
                 body: Box::new(items[2]
                     .clone()
                     .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.block()))
                 ),
             }),
             items[0].span().merge(items[2].span()),
+        )),
+
+        -2 % Patt::Brac('('), Patt::Brac(')'), Patt::Brac('{'), Patt::Brac('}'),
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Fn(FnExpr {
+                decl: Ok(FnDecl::new(
+                    FnDeclKind { params: vec![], ret: None },
+                    items[0].span().merge(items[1].span()),
+                )),
+                body: Box::new(Ok(Spanned::new(
+                    BlockExpr {
+                        stmts: vec![],
+                        expr: None,
+                    },
+                    items[2].span().merge(items[3].span()),
+                ))),
+            }),
+            items[0].span().merge(items[3].span()),
         )),
 
         // op
@@ -787,6 +791,22 @@ pub fn get_rules() -> HashSet<Rule> {
         2 %
             Patt::Kw("if"), Patt::Expr, Patt::Block,
             Patt::Kw("else"), Patt::Block
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::If(IfExpr {
+                condition: Box::new(items[1].clone().expr_or_err()),
+                body: Box::new(items[2]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.block()))
+                ),
+                else_expr: Some(Box::new(items[4].clone().expr_or_err())),
+            }),
+            items[0].span().merge(items[4].span()),
+        )),
+
+        2 %
+            Patt::Kw("if"), Patt::Expr, Patt::Block,
+            Patt::Kw("else"), Patt::If
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::If(IfExpr {
                 condition: Box::new(items[1].clone().expr_or_err()),

@@ -8,6 +8,9 @@ pub enum ExprKind {
     /** <id> */
     Id(IdExpr),
 
+    /** <unit> = () */
+    Unit,
+
     /** <paren> = (<expr>) */
     Paren(ParenExpr),
 
@@ -136,7 +139,7 @@ pub struct ConstExpr {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct FnExpr {
     pub decl: SynResult<FnDecl>,
-    pub body: Box<SynResult<Expr>>,
+    pub body: Box<SynResult<Spanned<BlockExpr>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

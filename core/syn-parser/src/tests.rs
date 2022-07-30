@@ -87,7 +87,6 @@ fn block() {
     );
 
     assert_stack!(
-        dbg
         parse!("{;;;}"),
         Patt::Block,
     );
@@ -110,5 +109,119 @@ fn block() {
             b
         }"),
         Patt::Block,
+    );
+}
+
+#[test]
+fn paren() {
+    assert_stack!(
+        parse!("(a)"),
+        Patt::Paren,
+    );
+
+    assert_stack!(
+        parse!("(())"),
+        Patt::Paren,
+    );
+
+    assert_stack!(
+        parse!("(let a = 1)"),
+        Patt::Paren,
+    );
+
+    assert_stack!(
+        parse!("(a + b)"),
+        Patt::Paren,
+    );
+}
+
+#[test]
+fn let_() {
+    assert_stack!(
+        parse!("let a = 1"),
+        Patt::Let,
+    );
+
+    assert_stack!(
+        parse!("let a"),
+        Patt::Let,
+    );
+
+    assert_stack!(
+        parse!("let a: i32"),
+        Patt::Let,
+    );
+
+    assert_stack!(
+        parse!("let a: i32 = 1"),
+        Patt::Let,
+    );
+}
+
+#[test]
+fn const_() {
+    assert_stack!(
+        parse!("const a: i32 = 1"),
+        Patt::Const,
+    );
+}
+
+#[test]
+fn fn_() {
+    assert_stack!(
+        parse!("() { 1 }"),
+        Patt::Fn,
+    );
+
+    assert_stack!(
+        parse!("() {}"),
+        Patt::Fn,
+    );
+
+    assert_stack!(
+        parse!("() { () }"),
+        Patt::Fn,
+    );
+
+    assert_stack!(
+        parse!("() -> i32 { 1 }"),
+        Patt::Fn,
+    );
+
+    assert_stack!(
+        parse!("(a: i32, b: i32) -> i32 { a + b }"),
+        Patt::Fn,
+    );
+
+    assert_stack!(
+        parse!("
+            (a: i32, b: i32) -> i32 {
+                a + b
+            }
+        "),
+        Patt::Fn,
+    );
+}
+
+#[test]
+fn if_() {
+    assert_stack!(
+        parse!("if a { 1 }"),
+        Patt::If,
+    );
+
+    assert_stack!(
+        parse!("if a { 1 } else { 2 }"),
+        Patt::If,
+    );
+
+    assert_stack!(
+        parse!("if a { 1 } else if b { 2 }"),
+        Patt::If,
+    );
+
+    assert_stack!(
+        parse!("if a { 1 } else if b { 2 } else { 3 }"),
+        Patt::If,
     );
 }
