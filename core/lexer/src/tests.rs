@@ -225,32 +225,47 @@ fn kw() {
 }
 
 #[test]
-fn punc() {
-    let mut lexer = Lexer::new("- + += !&! .*!&@");
+fn op() {
+    let mut lexer = Lexer::new("- + += !&! *!&@");
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Punc("-".to_owned()),
+        TokenKind::Op("-".to_owned()),
         Span::new(0, 0, 0..1, 0),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Punc("+".to_owned()),
+        TokenKind::Op("+".to_owned()),
         Span::new(0, 2, 2..3, 1),
     ))));
     
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Punc("+=".to_owned()),
+        TokenKind::Op("+=".to_owned()),
         Span::new(0, 4, 4..6, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Punc("!&!".to_owned()),
+        TokenKind::Op("!&!".to_owned()),
         Span::new(0, 7, 7..10, 1),
     ))));
 
     assert_eq!(lexer.next(), Some(Ok(Token::new(
-        TokenKind::Punc(".*!&@".to_owned()),
-        Span::new(0, 11, 11..16, 1),
+        TokenKind::Op("*!&@".to_owned()),
+        Span::new(0, 11, 11..15, 1),
+    ))));
+}
+
+#[test]
+fn punc() {
+    let mut lexer = Lexer::new("; .");
+
+    assert_eq!(lexer.next(), Some(Ok(Token::new(
+        TokenKind::Punc(";".to_owned()),
+        Span::new(0, 0, 0..1, 0),
+    ))));
+
+    assert_eq!(lexer.next(), Some(Ok(Token::new(
+        TokenKind::Punc(".".to_owned()),
+        Span::new(0, 2, 2..3, 1),
     ))));
 }
 
