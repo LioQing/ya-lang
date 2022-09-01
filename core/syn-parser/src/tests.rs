@@ -31,10 +31,7 @@ macro_rules! assert_stack {
 #[test]
 fn print() {
     println!("{:#?}", parse!("
-        const my_fn = const b = () {
-            let a = if a { 1 * (2 + *ptr) } else { b };
-            a
-        }
+        const a = () { (1] }
     "));
 }
 

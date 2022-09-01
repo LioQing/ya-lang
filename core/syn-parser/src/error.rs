@@ -12,6 +12,9 @@ pub enum ErrorKind {
 
     #[error("Ambiguous operators, add space in proper position to distinguish")]
     AmbiguousOps,
+
+    #[error("Mismatched parentheses, expected ')'")]
+    MismatchedParens,
 }
 
 /// Syntax error.

@@ -65,6 +65,12 @@ macro_rules! patt {
 
             /** keywords */
             Kw(&'static str),
+
+            /** any error */
+            AnyErr,
+
+            /** specific error */
+            Err(ErrorKind),
         }
 
         impl Patt {
@@ -93,6 +99,10 @@ macro_rules! patt {
                     | (
                         &Self::Id,
                         &StackItem::Expr(Expr { value: ExprKind::Id(_), .. }),
+                    )
+                    | (
+                        &Self::AnyErr,
+                        &StackItem::Err(_),
                     ) => true,
                     (
                         &Self::PuncStr(a),
@@ -114,6 +124,10 @@ macro_rules! patt {
                         &Self::Kw(a),
                         &StackItem::Token(Token { value: TokenKind::Kw(b), .. }),
                     ) if regex::Regex::new(a).unwrap().is_match(&b) => true,
+                    (
+                        &Self::Err(a),
+                        &StackItem::Err(Spanned { value: b, .. }),
+                    ) if a == b => true,
                     _ => false,
                 }
             }
@@ -258,6 +272,18 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[2].span()),
         )),
 
+        0 % Patt::Brac('('), Patt::Expr, Patt::Err(ErrorKind::Lexer(lexer::ErrorKind::MismatchedBracs(')', '}')))
+        => |items, _| StackItem::Err(Error::new(
+            ErrorKind::MismatchedParens,
+            items[0].span().merge(items[2].span()),
+        )),
+
+        0 % Patt::Brac('('), Patt::Expr, Patt::Err(ErrorKind::Lexer(lexer::ErrorKind::MismatchedBracs(')', ']')))
+        => |items, _| StackItem::Err(Error::new(
+            ErrorKind::MismatchedParens,
+            items[0].span().merge(items[2].span()),
+        )),
+
         // unit
 
         -3 % Patt::Brac('('), Patt::Brac(')')
@@ -350,6 +376,15 @@ pub fn get_rules() -> HashSet<Rule> {
         )),
 
         0 % Patt::Brac('{'), Patt::Expr, Patt::Brac('}')
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Block(BlockExpr {
+                stmts: vec![],
+                expr: Some(Box::new(items[1].clone().expr_or_err())),
+            }),
+            items[0].span().merge(items[1].span()),
+        )),
+
+        0 % Patt::Brac('{'), Patt::AnyErr, Patt::Brac('}')
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: vec![],
