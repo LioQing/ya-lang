@@ -304,6 +304,16 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[1].span()),
         )),
 
+        0 % Patt::AnyErr, Patt::PuncStr(";")
+        => |items, _| StackItem::Stmts(Repeats::new(
+            RepeatsKind::new(items[0]
+                .clone()
+                .expr_or_err()
+                .spanless(),
+            ),
+            items[0].span().merge(items[1].span()),
+        )),
+
         0 % Patt::PuncStr(";;+")
         => |items, _| items[0]
             .clone()
@@ -345,6 +355,19 @@ pub fn get_rules() -> HashSet<Rule> {
         )),
 
         0 % Patt::Brac('{'), Patt::Stmts, Patt::Expr, Patt::Brac('}')
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::Block(BlockExpr {
+                stmts: items[1]
+                    .clone()
+                    .stmts_or_err()
+                    .unwrap()
+                    .into_value_vec(),
+                expr: Some(Box::new(items[2].clone().expr_or_err())),
+            }),
+            items[0].span().merge(items[3].span()),
+        )),
+
+        0 % Patt::Brac('{'), Patt::Stmts, Patt::AnyErr, Patt::Brac('}')
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: items[1]
@@ -823,6 +846,20 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[2].span()),
         )),
 
+        2 % Patt::Kw("if"), Patt::AnyErr, Patt::Block
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::If(IfExpr {
+                condition: Box::new(items[1].clone().expr_or_err()),
+                body: Box::new(items[2]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.block()))
+                ),
+                else_expr: None,
+            }),
+            items[0].span().merge(items[2].span()),
+        )),
+
         2 %
             Patt::Kw("if"), Patt::Expr, Patt::Block,
             Patt::Kw("else"), Patt::Block
@@ -840,7 +877,39 @@ pub fn get_rules() -> HashSet<Rule> {
         )),
 
         2 %
+            Patt::Kw("if"), Patt::AnyErr, Patt::Block,
+            Patt::Kw("else"), Patt::Block
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::If(IfExpr {
+                condition: Box::new(items[1].clone().expr_or_err()),
+                body: Box::new(items[2]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.block()))
+                ),
+                else_expr: Some(Box::new(items[4].clone().expr_or_err())),
+            }),
+            items[0].span().merge(items[4].span()),
+        )),
+
+        2 %
             Patt::Kw("if"), Patt::Expr, Patt::Block,
+            Patt::Kw("else"), Patt::If
+        => |items, _| StackItem::Expr(Expr::new(
+            ExprKind::If(IfExpr {
+                condition: Box::new(items[1].clone().expr_or_err()),
+                body: Box::new(items[2]
+                    .clone()
+                    .expr_or_err()
+                    .map(|expr| expr.map_value(|expr| expr.block()))
+                ),
+                else_expr: Some(Box::new(items[4].clone().expr_or_err())),
+            }),
+            items[0].span().merge(items[4].span()),
+        )),
+
+        2 %
+            Patt::Kw("if"), Patt::AnyErr, Patt::Block,
             Patt::Kw("else"), Patt::If
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::If(IfExpr {
