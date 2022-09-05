@@ -31,7 +31,7 @@ macro_rules! assert_stack {
 #[test]
 fn print() {
     println!("{:#?}", parse!("
-    if (1} { 2 }
+    if (a) { }
     "));
 }
 

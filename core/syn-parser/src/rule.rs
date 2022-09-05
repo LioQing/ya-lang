@@ -71,6 +71,14 @@ macro_rules! patt {
 
             /** specific error */
             Err(ErrorKind),
+
+            // TODO
+
+            /** not a specific pattern */
+            Not(Box<Patt>),
+
+            /** any specific patterns */
+            Any(&'static [Patt]),
         }
 
         impl Patt {
@@ -128,6 +136,14 @@ macro_rules! patt {
                         &Self::Err(a),
                         &StackItem::Err(Spanned { value: b, .. }),
                     ) if a == b => true,
+                    (
+                        &Self::Not(a),
+                        b,
+                    ) => !a.match_item(b),
+                    (
+                        &Self::Any(a),
+                        b,
+                    ) => a.iter().any(|patt| patt.match_item(b)),
                     _ => false,
                 }
             }
@@ -272,13 +288,12 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[2].span()),
         )),
 
-        0 % Patt::Brac('('), Patt::Expr, Patt::Err(ErrorKind::Lexer(lexer::ErrorKind::MismatchedBracs(')', '}')))
-        => |items, _| StackItem::Err(Error::new(
-            ErrorKind::MismatchedParens,
-            items[0].span().merge(items[2].span()),
-        )),
-
-        0 % Patt::Brac('('), Patt::Expr, Patt::Err(ErrorKind::Lexer(lexer::ErrorKind::MismatchedBracs(')', ']')))
+        0 %
+            Patt::Brac('('), Patt::Expr,
+            Patt::Any(&[
+                Patt::Err(ErrorKind::Lexer(lexer::ErrorKind::MismatchedBracs(')', '}'))),
+                Patt::Err(ErrorKind::Lexer(lexer::ErrorKind::MismatchedBracs(')', ']'))),
+            ])
         => |items, _| StackItem::Err(Error::new(
             ErrorKind::MismatchedParens,
             items[0].span().merge(items[2].span()),
@@ -294,17 +309,7 @@ pub fn get_rules() -> HashSet<Rule> {
 
         // stmts
 
-        0 % Patt::Expr, Patt::PuncStr(";")
-        => |items, _| StackItem::Stmts(Repeats::new(
-            RepeatsKind::new(items[0]
-                .clone()
-                .expr_or_err()
-                .spanless(),
-            ),
-            items[0].span().merge(items[1].span()),
-        )),
-
-        0 % Patt::AnyErr, Patt::PuncStr(";")
+        0 % Patt::Any(&[Patt::Expr, Patt::AnyErr]), Patt::PuncStr(";")
         => |items, _| StackItem::Stmts(Repeats::new(
             RepeatsKind::new(items[0]
                 .clone()
@@ -354,20 +359,7 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[2].span()),
         )),
 
-        0 % Patt::Brac('{'), Patt::Stmts, Patt::Expr, Patt::Brac('}')
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::Block(BlockExpr {
-                stmts: items[1]
-                    .clone()
-                    .stmts_or_err()
-                    .unwrap()
-                    .into_value_vec(),
-                expr: Some(Box::new(items[2].clone().expr_or_err())),
-            }),
-            items[0].span().merge(items[3].span()),
-        )),
-
-        0 % Patt::Brac('{'), Patt::Stmts, Patt::AnyErr, Patt::Brac('}')
+        0 % Patt::Brac('{'), Patt::Stmts, Patt::Any(&[Patt::Expr, Patt::AnyErr]), Patt::Brac('}')
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: items[1]
@@ -398,16 +390,7 @@ pub fn get_rules() -> HashSet<Rule> {
             items[0].span().merge(items[1].span()),
         )),
 
-        0 % Patt::Brac('{'), Patt::Expr, Patt::Brac('}')
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::Block(BlockExpr {
-                stmts: vec![],
-                expr: Some(Box::new(items[1].clone().expr_or_err())),
-            }),
-            items[0].span().merge(items[1].span()),
-        )),
-
-        0 % Patt::Brac('{'), Patt::AnyErr, Patt::Brac('}')
+        0 % Patt::Brac('{'), Patt::Any(&[Patt::Expr, Patt::AnyErr]), Patt::Brac('}')
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::Block(BlockExpr {
                 stmts: vec![],
@@ -824,10 +807,7 @@ pub fn get_rules() -> HashSet<Rule> {
             }
         },
 
-        1 % Patt::Op, Patt::Brac('(')
-        => |_, _| StackItem::None,
-
-        1 % Patt::Op, Patt::Brac('{')
+        1 % Patt::Op, Patt::Any(&[Patt::Brac('('), Patt::Brac('{')])
         => |_, _| StackItem::None,
 
         // if
