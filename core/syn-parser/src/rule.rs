@@ -812,21 +812,7 @@ pub fn get_rules() -> HashSet<Rule> {
 
         // if
 
-        2 % Patt::Kw("if"), Patt::Expr, Patt::Block
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::If(IfExpr {
-                condition: Box::new(items[1].clone().expr_or_err()),
-                body: Box::new(items[2]
-                    .clone()
-                    .expr_or_err()
-                    .map(|expr| expr.map_value(|expr| expr.block()))
-                ),
-                else_expr: None,
-            }),
-            items[0].span().merge(items[2].span()),
-        )),
-
-        2 % Patt::Kw("if"), Patt::AnyErr, Patt::Block
+        2 % Patt::Kw("if"), Patt::Any(&[Patt::AnyErr, Patt::Expr]), Patt::Block
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::If(IfExpr {
                 condition: Box::new(items[1].clone().expr_or_err()),
@@ -841,7 +827,7 @@ pub fn get_rules() -> HashSet<Rule> {
         )),
 
         2 %
-            Patt::Kw("if"), Patt::Expr, Patt::Block,
+            Patt::Kw("if"), Patt::Any(&[Patt::AnyErr, Patt::Expr]), Patt::Block,
             Patt::Kw("else"), Patt::Block
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::If(IfExpr {
@@ -857,39 +843,7 @@ pub fn get_rules() -> HashSet<Rule> {
         )),
 
         2 %
-            Patt::Kw("if"), Patt::AnyErr, Patt::Block,
-            Patt::Kw("else"), Patt::Block
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::If(IfExpr {
-                condition: Box::new(items[1].clone().expr_or_err()),
-                body: Box::new(items[2]
-                    .clone()
-                    .expr_or_err()
-                    .map(|expr| expr.map_value(|expr| expr.block()))
-                ),
-                else_expr: Some(Box::new(items[4].clone().expr_or_err())),
-            }),
-            items[0].span().merge(items[4].span()),
-        )),
-
-        2 %
-            Patt::Kw("if"), Patt::Expr, Patt::Block,
-            Patt::Kw("else"), Patt::If
-        => |items, _| StackItem::Expr(Expr::new(
-            ExprKind::If(IfExpr {
-                condition: Box::new(items[1].clone().expr_or_err()),
-                body: Box::new(items[2]
-                    .clone()
-                    .expr_or_err()
-                    .map(|expr| expr.map_value(|expr| expr.block()))
-                ),
-                else_expr: Some(Box::new(items[4].clone().expr_or_err())),
-            }),
-            items[0].span().merge(items[4].span()),
-        )),
-
-        2 %
-            Patt::Kw("if"), Patt::AnyErr, Patt::Block,
+            Patt::Kw("if"), Patt::Any(&[Patt::AnyErr, Patt::Expr]), Patt::Block,
             Patt::Kw("else"), Patt::If
         => |items, _| StackItem::Expr(Expr::new(
             ExprKind::If(IfExpr {
